@@ -1,0 +1,23 @@
+# Node.js
+node_modules
+.next
+npm-debug.log
+*.log
+.pnp
+.pnp.js
+
+# Python
+venv/
+*.pyc
+__pycache__/
+.env
+.env.*
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
