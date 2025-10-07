@@ -24,12 +24,15 @@ class AthenaAgent:
     
     def __init__(self):
         # Load API key from environment or file
+        print("🔑 Loading API key...")
         self.api_key = self.load_api_key()
         if not self.api_key:
             raise ValueError("GOOGLE_API_KEY not found. Please set it in .env file or environment variables")
         
-        # Gemini API endpoint
-        self.api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={self.api_key}"
+        print(f"✅ API key loaded: {self.api_key[:12]}...")
+        
+        # Gemini API endpoint - Using the latest available model (Gemini 2.5 Flash)
+        self.api_url = f"https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key={self.api_key}"
         
         # Initialize sentence transformer for embeddings
         print("📚 Loading sentence transformer model...")
@@ -42,6 +45,10 @@ class AthenaAgent:
         self.document_chunks = []
         self.chunk_embeddings = None
         self.faiss_index = None
+        
+        # Test API connection
+        print("🔄 Testing API connection...")
+        self.test_api_connection()
         
         # Load and process documents
         self.load_documents()
@@ -102,6 +109,47 @@ class AthenaAgent:
                         return line.split('=', 1)[1].strip().strip('"\'')
         
         return None
+    
+    def test_api_connection(self):
+        """Test if the Gemini API is working with our API key"""
+        try:
+            test_payload = {
+                "contents": [{
+                    "parts": [{"text": "Hello, respond with 'API working'"}]
+                }],
+                "generationConfig": {
+                    "temperature": 0.1,
+                    "maxOutputTokens": 10
+                }
+            }
+            
+            data = json.dumps(test_payload).encode('utf-8')
+            req = urllib.request.Request(
+                self.api_url,
+                data=data,
+                headers={'Content-Type': 'application/json'}
+            )
+            
+            with urllib.request.urlopen(req, timeout=10) as response:
+                if response.status == 200:
+                    response_data = json.loads(response.read().decode())
+                    if 'candidates' in response_data and response_data['candidates']:
+                        print("✅ API connection successful!")
+                        return True
+                    else:
+                        print("⚠️ API responded but with unexpected format")
+                        return False
+                else:
+                    print(f"⚠️ API returned status {response.status}")
+                    return False
+                    
+        except urllib.error.HTTPError as e:
+            error_body = e.read().decode() if hasattr(e, 'read') else str(e)
+            print(f"❌ API HTTP Error {e.code}: {error_body}")
+            return False
+        except Exception as e:
+            print(f"❌ API connection failed: {e}")
+            return False
     
     def extract_text_from_pdf(self, pdf_path: str) -> str:
         """Extract text content from PDF file"""
@@ -236,7 +284,13 @@ class AthenaAgent:
                     "parts": [{
                         "text": prompt
                     }]
-                }]
+                }],
+                "generationConfig": {
+                    "temperature": 0.3,
+                    "topP": 0.8,
+                    "topK": 40,
+                    "maxOutputTokens": 2048
+                }
             }
             
             # Convert to JSON
@@ -252,33 +306,52 @@ class AthenaAgent:
             )
             
             # Make the request
-            with urllib.request.urlopen(req) as response:
-                response_data = json.loads(response.read().decode())
-            
-            # Extract the response text
-            if 'candidates' in response_data and len(response_data['candidates']) > 0:
-                content = response_data['candidates'][0]['content']
-                if 'parts' in content and len(content['parts']) > 0:
-                    athena_response = content['parts'][0]['text']
-                    
-                    # Add to conversation history
-                    self.conversation_history.append({
-                        "role": "user",
-                        "content": user_query,
-                        "timestamp": datetime.now().isoformat()
-                    })
-                    self.conversation_history.append({
-                        "role": "assistant",
-                        "content": athena_response,
-                        "timestamp": datetime.now().isoformat()
-                    })
-                    
-                    return athena_response
-            
-            return "I apologize, but I'm having trouble generating a response right now. Please try again."
+            try:
+                with urllib.request.urlopen(req, timeout=30) as response:
+                    if response.status == 200:
+                        response_data = json.loads(response.read().decode())
+                        
+                        # Debug: Print response structure for troubleshooting
+                        print(f"🔍 API Response Status: {response.status}")
+                        
+                        # Extract the response text
+                        if 'candidates' in response_data and len(response_data['candidates']) > 0:
+                            candidate = response_data['candidates'][0]
+                            
+                            if 'content' in candidate and 'parts' in candidate['content']:
+                                athena_response = candidate['content']['parts'][0]['text']
+                                
+                                # Add to conversation history
+                                self.conversation_history.append({
+                                    "role": "user",
+                                    "content": user_query,
+                                    "timestamp": datetime.now().isoformat()
+                                })
+                                self.conversation_history.append({
+                                    "role": "assistant",
+                                    "content": athena_response,
+                                    "timestamp": datetime.now().isoformat()
+                                })
+                                
+                                return f"⚖️ {athena_response}"
+                            else:
+                                return "❌ Unexpected response format from API. The response structure has changed."
+                        else:
+                            return "❌ No valid response candidates returned from API."
+                    else:
+                        return f"❌ API returned status code: {response.status}"
+                        
+            except urllib.error.HTTPError as e:
+                error_body = e.read().decode() if hasattr(e, 'read') else str(e)
+                return f"❌ HTTP Error {e.code}: {error_body}"
+            except urllib.error.URLError as e:
+                return f"❌ Connection Error: {e.reason}"
+            except json.JSONDecodeError as e:
+                return f"❌ Invalid JSON response from API: {e}"
             
         except Exception as e:
-            error_response = f"I apologize, but I'm experiencing some technical difficulties right now. Error: {str(e)}"
+            print(f"🔍 Debug - Unexpected error: {type(e).__name__}: {str(e)}")
+            error_response = f"❌ I'm experiencing technical difficulties. Please check your internet connection and API key. Error: {str(e)}"
             return error_response
     
     def reset_conversation(self):
