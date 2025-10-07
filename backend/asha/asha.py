@@ -22,7 +22,7 @@ class AshaAgent:
             raise ValueError("GOOGLE_API_KEY not found. Please set it in .env file or environment variables")
         
         # Gemini API endpoint
-        self.api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={self.api_key}"
+        self.api_url = f"https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key={self.api_key}"
         
         # System prompt for ASHA
         self.system_prompt = """
