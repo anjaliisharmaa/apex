@@ -35,7 +35,7 @@ class ScribeAgent:
         self.api_available = False
         
         if self.api_key:
-            self.api_url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={self.api_key}"
+            self.api_url = f"https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key={self.api_key}"
             self.api_available = self.test_api_connection()
         
         if not self.api_available:
@@ -79,6 +79,9 @@ class ScribeAgent:
     def test_api_connection(self) -> bool:
         """Test if the Gemini API is available."""
         try:
+            import urllib.request
+            import json
+            
             test_payload = {
                 "contents": [
                     {
@@ -93,20 +96,26 @@ class ScribeAgent:
                 }
             }
             
-            response = requests.post(
-                self.api_url, 
-                json=test_payload, 
-                headers={'Content-Type': 'application/json'},
-                timeout=10
+            data = json.dumps(test_payload).encode('utf-8')
+            req = urllib.request.Request(
+                self.api_url,
+                data=data,
+                headers={'Content-Type': 'application/json'}
             )
             
-            if response.status_code == 200:
-                print("🌐 API connection successful!")
-                return True
-            else:
-                print(f"⚠️  API returned status {response.status_code}")
-                return False
-                
+            with urllib.request.urlopen(req, timeout=10) as response:
+                if response.status == 200:
+                    response_data = json.loads(response.read().decode())
+                    if 'candidates' in response_data and response_data['candidates']:
+                        print("🌐 API connection successful!")
+                        return True
+                    else:
+                        print("⚠️  API responded but with unexpected format")
+                        return False
+                else:
+                    print(f"⚠️  API returned status {response.status}")
+                    return False
+                    
         except Exception as e:
             print(f"⚠️  API connection failed: {e}")
             return False
@@ -639,70 +648,183 @@ Step {step['step']}: {step['title']}
             return f"❌ Error retrieving document requirements: {e}"
     
     def query_api(self, user_input: str) -> str:
-        """Query the Gemini API for document and workflow assistance."""
+        """Query the Gemini API for comprehensive content generation."""
         try:
-            # Enhanced system prompt for Scribe
-            system_prompt = """You are Scribe, an AI Documentation and Workflow Assistant specializing in:
+            # Enhanced system prompt for all-purpose content generation
+            system_prompt = """You are Scribe, an Advanced AI Content Generation Assistant specializing in:
 
-1. **Document Generation**: Creating legal forms, applications, and official documents
-2. **Process Guidance**: Providing step-by-step workflows for organizational processes  
-3. **Compliance Assistance**: Ensuring documents meet legal and policy requirements
-4. **Form Validation**: Checking completeness and accuracy of submitted information
+**CONTENT GENERATION CAPABILITIES:**
+1. **Legal Documents**: Applications, forms, petitions, legal letters
+2. **Professional Communications**: Emails, letters, memos, reports
+3. **HR Documents**: Leave applications, transfer requests, grievance forms, policy documents
+4. **Personal Communications**: WhatsApp messages, SMS, social media posts
+5. **Business Content**: Proposals, contracts, agreements, notices
+6. **Educational Content**: Training materials, guides, tutorials
+7. **Marketing Content**: Announcements, newsletters, promotional text
 
-Your expertise includes:
-- Indian labor law compliance
-- HR processes and procedures
-- Official document formatting
-- Workflow management
-- Form validation and submission guidance
+**COMMUNICATION FORMATS:**
+- 📧 **Professional Emails**: Formal business communication with proper structure
+- 📱 **WhatsApp Messages**: Casual but clear messaging for various purposes  
+- 📲 **SMS/Text Messages**: Concise, direct communication
+- 📝 **Official Letters**: Formal correspondence with letterhead format
+- 📋 **Forms & Applications**: Structured documents with proper fields
+- 📄 **Reports & Documentation**: Comprehensive formatted reports
 
-Provide clear, professional, and legally compliant responses. Always prioritize accuracy and include relevant compliance information when discussing legal documents or processes.
+**KEY FEATURES:**
+- Generate content in appropriate tone (formal, casual, urgent, friendly)
+- Include proper formatting and structure for each medium
+- Ensure legal compliance for official documents
+- Adapt language for target audience and purpose
+- Provide multiple format options when requested
 
-Focus on being helpful with document creation, form filling guidance, process workflows, and ensuring all documentation meets required standards."""
+**INDIAN LEGAL COMPLIANCE:**
+- Follow Indian labor law requirements
+- Include mandatory clauses and disclaimers
+- Ensure regulatory compliance for HR documents
+- Reference relevant acts and regulations
 
+**INSTRUCTIONS:**
+- Always ask for clarification if purpose or audience is unclear
+- Provide content in the exact format requested
+- Include subject lines for emails, proper greetings for messages
+- Add compliance notes for legal documents
+- Offer multiple tone options when appropriate
+
+**USER REQUEST:** {user_input}
+
+Please generate the requested content with appropriate formatting and tone:"""
+
+            # Use urllib instead of requests for better compatibility
+            import urllib.request
+            import urllib.parse
+            import json
+            
             payload = {
                 "contents": [
                     {
                         "parts": [
-                            {"text": f"{system_prompt}\n\nUser Query: {user_input}"}
+                            {"text": system_prompt}
                         ]
                     }
                 ],
                 "generationConfig": {
-                    "temperature": 0.3,  # Lower temperature for more consistent, professional responses
-                    "topP": 0.8,
+                    "temperature": 0.4,  # Balanced creativity and consistency
+                    "topP": 0.9,
                     "topK": 40,
-                    "maxOutputTokens": 1024
+                    "maxOutputTokens": 2048  # More tokens for longer content
                 }
             }
             
-            response = requests.post(
-                self.api_url, 
-                json=payload, 
-                headers={'Content-Type': 'application/json'},
-                timeout=30
+            # Convert to JSON
+            data = json.dumps(payload).encode('utf-8')
+            
+            # Create request
+            req = urllib.request.Request(
+                self.api_url,
+                data=data,
+                headers={'Content-Type': 'application/json'}
             )
             
-            if response.status_code == 200:
-                result = response.json()
-                if 'candidates' in result and result['candidates']:
-                    content = result['candidates'][0]['content']['parts'][0]['text']
-                    return content.strip()
+            # Make the request
+            with urllib.request.urlopen(req, timeout=30) as response:
+                if response.status == 200:
+                    response_data = json.loads(response.read().decode())
+                    
+                    # Extract the response text with proper error handling
+                    if 'candidates' in response_data and response_data['candidates']:
+                        candidate = response_data['candidates'][0]
+                        
+                        if 'content' in candidate and 'parts' in candidate['content']:
+                            content = candidate['content']['parts'][0]['text']
+                            return f"📝 {content.strip()}"
+                        else:
+                            return "❌ Unexpected API response format. Please try again."
+                    else:
+                        return "❌ No response generated. Please rephrase your request."
                 else:
-                    return "❌ No response generated from API"
-            else:
-                return f"❌ API Error {response.status_code}: {response.text}"
-                
+                    return f"❌ API returned status code: {response.status}"
+                    
+        except urllib.error.HTTPError as e:
+            error_body = e.read().decode() if hasattr(e, 'read') else str(e)
+            return f"❌ API HTTP Error {e.code}: {error_body}"
+        except urllib.error.URLError as e:
+            return f"❌ Connection Error: {e.reason}"
         except Exception as e:
-            return f"❌ API query failed: {e}"
+            return f"❌ API query failed: {str(e)}"
     
     def get_offline_response(self, user_input: str) -> str:
-        """Provide offline responses for common document and workflow queries."""
+        """Provide enhanced offline responses for all types of content generation."""
         
         # Convert to lowercase for matching
         query = user_input.lower()
         
-        # Document generation queries
+        # Email generation queries
+        if any(word in query for word in ['email', 'e-mail', 'mail']):
+            return """
+📧 EMAIL GENERATION ASSISTANCE:
+═══════════════════════════════
+
+I can help you generate various types of emails:
+
+**Professional Emails:**
+• Job applications and follow-ups
+• Meeting requests and scheduling
+• Project updates and reports
+• Client communication
+• Vendor correspondence
+
+**HR Emails:**
+• Leave requests
+• Policy clarifications
+• Training confirmations
+• Performance feedback requests
+
+**Personal Emails:**
+• Thank you messages
+• Apology letters
+• Event invitations
+• Congratulations
+
+**FORMAT:** "Generate email for [purpose] to [recipient] about [topic]"
+**EXAMPLE:** "Generate email for leave request to HR about medical emergency"
+
+💡 **Tip:** Specify tone (formal/casual), urgency level, and key points to include!
+"""
+        
+        # WhatsApp/SMS generation queries  
+        if any(word in query for word in ['whatsapp', 'whats app', 'wa', 'sms', 'text message', 'message']):
+            return """
+📱 WHATSAPP & SMS GENERATION:
+════════════════════════════
+
+I can create messages for various purposes:
+
+**Professional Messages:**
+• Meeting reminders and updates
+• Quick status updates
+• Deadline notifications
+• Team announcements
+
+**Personal Messages:**
+• Birthday wishes and greetings
+• Event invitations
+• Thank you messages
+• Apology texts
+• Congratulations
+
+**Business Messages:**
+• Customer follow-ups
+• Appointment confirmations
+• Service updates
+• Payment reminders
+
+**FORMAT:** "Create WhatsApp message for [purpose] to [recipient]"
+**EXAMPLE:** "Create WhatsApp message for birthday wishes to colleague"
+
+💡 **Tip:** Specify relationship (formal/casual) and message length preference!
+"""
+        
+        # Legal document queries
         if any(word in query for word in ['maternity', 'pregnancy', 'child', 'baby']):
             return self.get_document_requirements('maternity_leave') + "\n\n" + self.get_workflow_guide('maternity_leave_process')
         
@@ -714,6 +836,59 @@ Focus on being helpful with document creation, form filling guidance, process wo
         
         if any(word in query for word in ['leave', 'vacation', 'absent', 'off']):
             return self.get_document_requirements('leave_application')
+        
+        # Content generation queries
+        if any(word in query for word in ['generate', 'create', 'write', 'draft', 'compose']):
+            return """
+✍️ CONTENT GENERATION CAPABILITIES:
+═══════════════════════════════════
+
+I can generate comprehensive content for:
+
+**📧 DIGITAL COMMUNICATION:**
+• Professional emails with proper formatting
+• WhatsApp messages (casual/formal)
+• SMS/text messages (concise)
+• Social media posts
+• Instant messaging content
+
+**📋 OFFICIAL DOCUMENTS:**
+• Legal applications and forms
+• Business letters and proposals
+• Reports and documentation
+• Policies and procedures
+• Contracts and agreements
+
+**💼 WORKPLACE CONTENT:**
+• Meeting agendas and minutes
+• Project proposals
+• Performance reviews
+• Training materials
+• Standard Operating Procedures (SOPs)
+
+**🎯 MARKETING CONTENT:**
+• Announcements and notices
+• Promotional text
+• Event descriptions
+• Product descriptions
+• Newsletter content
+
+**📱 COMMUNICATION FORMATS:**
+• Formal business tone
+• Casual friendly tone
+• Urgent/priority messaging
+• Informational content
+• Persuasive communication
+
+**HOW TO USE:**
+Simply describe what you need:
+• "Generate formal email to boss about sick leave"
+• "Create WhatsApp message for team meeting reminder"
+• "Write professional apology letter to client"
+• "Draft SMS for appointment confirmation"
+
+💡 **Always specify:** Purpose, recipient, tone, and any key details to include!
+"""
         
         # Workflow queries
         if 'workflow' in query or 'process' in query or 'steps' in query:
@@ -747,56 +922,83 @@ Example: 'requirements maternity_leave'
         # Help queries
         if any(word in query for word in ['help', 'commands', 'what can', 'how to']):
             return """
-📚 Scribe Documentation Assistant - Command Guide
-═══════════════════════════════════════════════
+📚 Scribe Advanced Content Generator - Complete Guide
+════════════════════════════════════════════════════
 
-🔧 **Document Generation Commands:**
-• `generate [doc_type]` - Start interactive document creation
-• `requirements [doc_type]` - See required fields for a document
-• `documents` - List all available document types
+� **CONTENT GENERATION CAPABILITIES:**
 
-🔄 **Workflow Commands:**  
-• `workflow [process_name]` - Get step-by-step process guide
-• `processes` - List all available workflow guides
+📧 **EMAIL GENERATION:**
+• "Generate email for [purpose] to [recipient]"
+• "Write formal email about [topic]"
+• "Create follow-up email for [situation]"
 
-📋 **Available Document Types:**
-• maternity_leave, transfer_request, grievance_form, leave_application
+� **MESSAGING & COMMUNICATION:**
+• "Create WhatsApp message for [purpose]"
+• "Write SMS for [situation]"
+• "Generate text message about [topic]"
 
-🔄 **Available Processes:**
-• maternity_leave_process, transfer_process, grievance_process
+📋 **DOCUMENT CREATION:**
+• "Generate [document_type] application"
+• "Create official letter for [purpose]"
+• "Write report about [topic]"
 
-💡 **Examples:**
-• "requirements maternity_leave"
-• "workflow transfer_process"  
-• "generate grievance_form"
-• "How do I apply for maternity leave?"
-• "What documents do I need for transfer?"
+🔄 **WORKFLOW GUIDANCE:**
+• "Show process for [activity]"
+• "What are the steps for [procedure]"
+• "Guide me through [workflow]"
 
-📞 **Session Commands:**
+💡 **CONTENT EXAMPLES:**
+• "Generate professional email to boss requesting sick leave"
+• "Create WhatsApp message for team meeting reminder"
+• "Write formal apology letter to client for delay"
+• "Generate maternity leave application for SSPL employee"
+• "Create SMS for appointment confirmation"
+
+📞 **QUICK COMMANDS:**
+• `documents` - List all document types
+• `processes` - List available workflows  
 • `summary` - View session statistics
 • `reset` - Start new session
 • `quit`/`exit` - End session
+
+🎯 **HOW TO GET BEST RESULTS:**
+1. **Be Specific:** State purpose, recipient, and tone
+2. **Include Context:** Mention important details
+3. **Specify Format:** Email, WhatsApp, SMS, letter, etc.
+4. **Choose Tone:** Formal, casual, urgent, friendly
+
+💼 **BUSINESS COMMUNICATION READY!**
+I can generate content for any professional or personal communication need!
 """
         
         # Default response for unrecognized queries
         return f"""
-📋 I can help you with document generation and workflow guidance!
+� Scribe Advanced Content Generator - Ready to Help!
+═══════════════════════════════════════════════════
 
 **Your query:** "{user_input}"
 
-I specialize in:
-• Creating official forms and applications
-• Providing step-by-step process guidance  
-• Document requirements and compliance
-• Workflow management
+🚀 **I can generate ANY type of content:**
 
-Try asking about:
-• "maternity leave application"
-• "transfer request process" 
-• "grievance procedure"
-• "leave application requirements"
+📧 **Emails:** Professional, personal, follow-ups, requests
+📱 **Messages:** WhatsApp, SMS, instant messaging  
+📋 **Documents:** Applications, letters, reports, forms
+💼 **Business:** Proposals, contracts, announcements
+🎯 **Marketing:** Promotions, newsletters, descriptions
 
-Type 'help' for a complete command guide.
+**JUST TELL ME WHAT YOU NEED:**
+• "Generate email for..."
+• "Create WhatsApp message about..."
+• "Write formal letter for..."
+• "Draft SMS for..."
+
+**EXAMPLES:**
+• "Generate professional email to HR about maternity leave"
+• "Create WhatsApp message for birthday wishes to colleague"
+• "Write formal complaint letter to management"
+• "Draft SMS for meeting reminder"
+
+Type 'help' for complete capabilities and examples!
 """
     
     def process_user_input(self, user_input: str) -> str:
