@@ -60,133 +60,28 @@ class CaseInfo(BaseModel):
     created_at: str
     last_updated: str
 
-# Agent instances (lazy loaded)
-agents = {
-    'asha': None,
-    'athena': None,
-    'scribe': None
-}
+# Orchestrator agent (manages all other agents)
+orchestrator_agent = None
 
-# Conversation storage (in production, use a database)
+# Legacy conversation storage (maintained for compatibility)
 conversations = {}
 
-def get_asha_agent():
-    """Lazy load ASHA agent - ORIGINAL asha.py"""
-    if agents['asha'] is None:
+def get_orchestrator_agent():
+    """Get or create the orchestrator agent instance"""
+    global orchestrator_agent
+    if orchestrator_agent is None:
         try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'asha'))
-            from asha import AshaAgent
-            agents['asha'] = AshaAgent()
-            print("✅ ASHA Agent (ORIGINAL) initialized!")
+            sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'core'))
+            from orchestrator import OrchestratorAgent
+            orchestrator_agent = OrchestratorAgent()
+            print("✅ Orchestrator Agent initialized with all sub-agents!")
         except Exception as e:
-            print(f"❌ Failed to initialize ASHA Agent: {e}")
-            agents['asha'] = 'failed'
+            print(f"❌ Failed to initialize Orchestrator Agent: {e}")
+            orchestrator_agent = 'failed'
     
-    return agents['asha'] if agents['asha'] != 'failed' else None
+    return orchestrator_agent if orchestrator_agent != 'failed' else None
 
-def get_athena_agent():
-    """Lazy load Athena agent - ORIGINAL athena.py"""
-    if agents['athena'] is None:
-        try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'athena'))
-            from athena import AthenaAgent
-            agents['athena'] = AthenaAgent()
-            print("✅ Athena Agent (ORIGINAL) initialized!")
-        except Exception as e:
-            print(f"❌ Failed to initialize Athena Agent: {e}")
-            agents['athena'] = 'failed'
-    
-    return agents['athena'] if agents['athena'] != 'failed' else None
-
-def get_scribe_agent():
-    """Lazy load Scribe agent - ORIGINAL scribe.py"""
-    if agents['scribe'] is None:
-        try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'scribe'))
-            from scribe import ScribeAgent
-            agents['scribe'] = ScribeAgent()
-            print("✅ Scribe Agent (ORIGINAL) initialized!")
-        except Exception as e:
-            print(f"❌ Failed to initialize Scribe Agent: {e}")
-            agents['scribe'] = 'failed'
-    
-    return agents['scribe'] if agents['scribe'] != 'failed' else None
-
-class OrchestrationEngine:
-    """
-    Smart routing engine to determine which agent should handle each query
-    """
-    
-    @staticmethod
-    def analyze_intent(message: str) -> str:
-        """
-        Analyze user message to determine appropriate agent
-        Returns: 'asha', 'athena', or 'scribe'
-        """
-        message_lower = message.lower()
-        
-        # Legal keywords for Athena
-        legal_keywords = [
-            'legal', 'law', 'rights', 'harassment', 'discrimination', 
-            'wage', 'salary', 'employment', 'termination', 'contract',
-            'labor', 'workplace', 'policy', 'regulation', 'act',
-            'court', 'litigation', 'compliance', 'violation',
-            'maternity rights', 'paternity', 'overtime', 'minimum wage'
-        ]
-        
-        # Document generation keywords for Scribe
-        document_keywords = [
-            'generate', 'create', 'write', 'draft', 'compose',
-            'application', 'form', 'letter', 'email', 'message',
-            'whatsapp', 'sms', 'document', 'report', 'proposal',
-            'contract', 'agreement', 'notice', 'memo',
-            'maternity leave application', 'transfer request',
-            'grievance form', 'leave application'
-        ]
-        
-        # Emotional support keywords for ASHA
-        emotional_keywords = [
-            'stressed', 'anxiety', 'worried', 'scared', 'overwhelmed',
-            'depressed', 'upset', 'frustrated', 'angry', 'sad',
-            'support', 'help me cope', 'emotional', 'feeling',
-            'mental health', 'wellbeing', 'counseling', 'guidance',
-            'comfort', 'reassurance', 'encouragement'
-        ]
-        
-        # Count keyword matches
-        legal_score = sum(1 for keyword in legal_keywords if keyword in message_lower)
-        document_score = sum(1 for keyword in document_keywords if keyword in message_lower)
-        emotional_score = sum(1 for keyword in emotional_keywords if keyword in message_lower)
-        
-        # Specific phrase matching for better accuracy
-        if any(phrase in message_lower for phrase in ['generate', 'create', 'write', 'draft']):
-            if any(doc in message_lower for doc in ['email', 'message', 'letter', 'application', 'form']):
-                return 'scribe'
-        
-        if any(phrase in message_lower for phrase in ['my rights', 'is this legal', 'labor law', 'can my employer']):
-            return 'athena'
-            
-        if any(phrase in message_lower for phrase in ['i feel', 'i am worried', 'help me cope', 'emotional support']):
-            return 'asha'
-        
-        # Score-based decision
-        max_score = max(legal_score, document_score, emotional_score)
-        
-        if max_score == 0:
-            # Default routing based on message characteristics
-            if '?' in message and any(word in message_lower for word in ['how', 'what', 'when', 'where', 'why']):
-                return 'athena'  # Questions likely legal
-            elif any(word in message_lower for word in ['please', 'can you', 'help me']):
-                return 'asha'  # Requests likely need emotional support
-            else:
-                return 'athena'  # Default to legal assistance
-        
-        if legal_score == max_score:
-            return 'athena'
-        elif document_score == max_score:
-            return 'scribe'
-        else:
-            return 'asha'
+# OrchestrationEngine replaced by OrchestratorAgent in core/orchestrator.py
 
 # API Endpoints
 
@@ -210,40 +105,30 @@ async def chat_endpoint(request: ChatRequest):
     Main chat endpoint - routes messages to appropriate agent
     """
     try:
-        # Determine which agent to use
-        agent_to_use = OrchestrationEngine.analyze_intent(request.message)
+        # Get orchestrator agent
+        orchestrator = get_orchestrator_agent()
+        if not orchestrator:
+            raise HTTPException(status_code=503, detail="Orchestrator service unavailable")
         
-        # Generate conversation ID if not provided
-        conversation_id = request.conversation_id or f"conv_{datetime.now().timestamp()}"
+        # Generate session/conversation ID if not provided
+        session_id = request.conversation_id or f"session_{datetime.now().timestamp()}"
         
-        # Route to appropriate agent
-        response = None
+        # Process message through orchestrator (handles all routing and workflows)
+        result = orchestrator.process_message(
+            message=request.message,
+            session_id=session_id,
+            user_id=None if request.anonymous else "user"
+        )
         
-        if agent_to_use == 'asha':
-            agent = get_asha_agent()
-            if agent:
-                response = agent.get_response(request.message)
-            else:
-                response = "I'm sorry, the emotional support assistant is currently unavailable. Please try again later."
-        
-        elif agent_to_use == 'athena':
-            agent = get_athena_agent()
-            if agent:
-                response = agent.get_response(request.message)
-            else:
-                response = "I'm sorry, the legal assistant is currently unavailable. Please try again later."
-        
-        elif agent_to_use == 'scribe':
-            agent = get_scribe_agent()
-            if agent:
-                response = agent.process_user_input(request.message)
-            else:
-                response = "I'm sorry, the document generator is currently unavailable. Please try again later."
+        response = result["response"]
+        agent_used = result["agent_used"]
+        conversation_id = result["session_id"]
         
         if not response:
             response = "I'm sorry, I couldn't understand your request. Please try again."
         
         # Store conversation (in production, use database)
+        # Store in legacy conversation format for compatibility
         if conversation_id not in conversations:
             conversations[conversation_id] = []
         
@@ -251,12 +136,12 @@ async def chat_endpoint(request: ChatRequest):
             "timestamp": datetime.now().isoformat(),
             "user_message": request.message,
             "agent_response": response,
-            "agent_used": agent_to_use
+            "agent_used": agent_used
         })
         
         return ChatResponse(
             response=response,
-            agent_used=agent_to_use,
+            agent_used=agent_used,
             conversation_id=conversation_id,
             timestamp=datetime.now().isoformat()
         )
@@ -267,17 +152,20 @@ async def chat_endpoint(request: ChatRequest):
 @app.post("/api/forms/generate", response_model=DocumentResponse)
 async def generate_document(request: DocumentRequest):
     """
-    Document generation endpoint - uses Scribe agent
+    Document generation endpoint - uses Orchestrator with Scribe specialization
     """
     try:
-        scribe_agent = get_scribe_agent()
-        if not scribe_agent:
-            raise HTTPException(status_code=503, detail="Document generator not available")
+        orchestrator = get_orchestrator_agent()
+        if not orchestrator:
+            raise HTTPException(status_code=503, detail="Document generation service unavailable")
         
-        document_content = scribe_agent.generate_document(
-            request.document_type,
-            request.user_data
-        )
+        # Create a document generation message
+        doc_message = f"Generate a {request.document_type} document with the following information: {json.dumps(request.user_data)}"
+        
+        session_id = f"doc_session_{datetime.now().timestamp()}"
+        result = orchestrator.process_message(doc_message, session_id)
+        
+        document_content = result["response"]
         
         return DocumentResponse(
             document_content=document_content,
@@ -353,19 +241,26 @@ async def get_resources():
 @app.get("/api/agents/status")
 async def get_agents_status():
     """
-    Get status of all agents
+    Get status of orchestrator and all sub-agents
     """
+    orchestrator = get_orchestrator_agent()
+    orchestrator_status = "available" if orchestrator and orchestrator != 'failed' else "failed"
+    
     return {
+        "orchestrator": {
+            "status": orchestrator_status,
+            "description": "Central coordination agent managing all specialists"
+        },
         "asha": {
-            "status": "available" if agents['asha'] is None or (agents['asha'] and agents['asha'] != 'failed') else "failed",
+            "status": orchestrator_status,  # Managed by orchestrator
             "description": "Emotional support and wellness assistant"
         },
         "athena": {
-            "status": "available" if agents['athena'] is None or (agents['athena'] and agents['athena'] != 'failed') else "failed",
+            "status": orchestrator_status,  # Managed by orchestrator
             "description": "Legal guidance and consultation assistant"
         },
         "scribe": {
-            "status": "available" if agents['scribe'] is None or (agents['scribe'] and agents['scribe'] != 'failed') else "failed",
+            "status": orchestrator_status,  # Managed by orchestrator
             "description": "Document generation and workflow assistant"
         }
     }
