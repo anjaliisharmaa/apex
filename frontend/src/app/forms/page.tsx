@@ -9,11 +9,13 @@ import {
   UserIcon,
   HomeIcon,
   ExclamationTriangleIcon,
-  CogIcon
+  CogIcon,
+  SparklesIcon
 } from '@heroicons/react/24/outline'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { apiClient } from '@/lib/api'
 
 interface FormCategory {
   id: string
@@ -204,6 +206,45 @@ const allForms = formCategories.flatMap(category => category.forms)
 export default function FormsPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
+  const [isGeneratingPreview, setIsGeneratingPreview] = useState<string | null>(null)
+  const [previewContent, setPreviewContent] = useState<{ [key: string]: string }>({})
+  
+  // use shared apiClient singleton from lib/api
+
+  const handlePreviewSample = async (formId: string, formName: string) => {
+    if (previewContent[formId]) {
+      // If preview already exists, just show it (in a real app, you'd open a modal)
+      alert(previewContent[formId])
+      return
+    }
+
+    setIsGeneratingPreview(formId)
+    try {
+      const response = await apiClient.generateDocument({
+        document_type: formName,
+        user_data: {
+          // Sample data for preview
+          name: "Sample User",
+          employee_id: "EMP001",
+          department: "Human Resources",
+          preview_mode: true
+        }
+      })
+      
+      setPreviewContent(prev => ({
+        ...prev,
+        [formId]: response.document_content || `Generated preview for ${formName}`
+      }))
+      
+      // In a real app, you'd open a modal or navigate to a preview page
+      alert(`Preview generated for ${formName}:\n\n${response.document_content || 'Document content generated successfully'}`)
+    } catch (error) {
+      console.error('Error generating preview:', error)
+      alert('Failed to generate preview. Please try again.')
+    } finally {
+      setIsGeneratingPreview(null)
+    }
+  }
 
   const filteredForms = allForms.filter(form => {
     const matchesSearch = form.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -296,8 +337,21 @@ export default function FormsPage() {
                     <Link href={`/forms/${form.id}`}>
                       <Button className="w-full">Start Form</Button>
                     </Link>
-                    <Button variant="ghost" size="sm" className="w-full">
-                      Preview Sample
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="w-full"
+                      onClick={() => handlePreviewSample(form.id, form.name)}
+                      disabled={isGeneratingPreview === form.id}
+                    >
+                      {isGeneratingPreview === form.id ? (
+                        <>
+                          <SparklesIcon className="h-4 w-4 mr-1 animate-spin" />
+                          Generating...
+                        </>
+                      ) : (
+                        'Preview Sample'
+                      )}
                     </Button>
                   </div>
                 </CardContent>
@@ -348,8 +402,21 @@ export default function FormsPage() {
                           <Link href={`/forms/${form.id}`}>
                             <Button className="w-full">Start Form</Button>
                           </Link>
-                          <Button variant="ghost" size="sm" className="w-full">
-                            Preview Sample
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="w-full"
+                            onClick={() => handlePreviewSample(form.id, form.name)}
+                            disabled={isGeneratingPreview === form.id}
+                          >
+                            {isGeneratingPreview === form.id ? (
+                              <>
+                                <SparklesIcon className="h-4 w-4 mr-1 animate-spin" />
+                                Generating...
+                              </>
+                            ) : (
+                              'Preview Sample'
+                            )}
                           </Button>
                         </div>
                       </CardContent>
@@ -393,8 +460,21 @@ export default function FormsPage() {
                       <Link href={`/forms/${form.id}`}>
                         <Button className="w-full">Start Form</Button>
                       </Link>
-                      <Button variant="ghost" size="sm" className="w-full">
-                        Preview Sample
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="w-full"
+                        onClick={() => handlePreviewSample(form.id, form.name)}
+                        disabled={isGeneratingPreview === form.id}
+                      >
+                        {isGeneratingPreview === form.id ? (
+                          <>
+                            <SparklesIcon className="h-4 w-4 mr-1 animate-spin" />
+                            Generating...
+                          </>
+                        ) : (
+                          'Preview Sample'
+                        )}
                       </Button>
                     </div>
                   </CardContent>

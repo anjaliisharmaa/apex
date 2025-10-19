@@ -6,11 +6,15 @@ import {
   PaperAirplaneIcon,
   PlusIcon,
   ChevronLeftIcon,
-  ChevronRightIcon
+  ChevronRightIcon,
+  CpuChipIcon,
+  CheckCircleIcon
 } from '@heroicons/react/24/outline'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
+import { AgentStatus } from '@/components/agent-status'
+import { apiClient, formatAgentName, getWorkflowDescription, getIntentColor, type ChatResponse } from '@/lib/api'
 
 interface Message {
   id: string
@@ -19,6 +23,20 @@ interface Message {
   timestamp: Date
   type?: 'text' | 'buttons' | 'file'
   buttons?: { label: string; action: string }[]
+  // Enhanced for orchestrator integration
+  agentUsed?: string
+  workflowType?: string
+  conversationState?: string
+  intentAnalysis?: {
+    primary_intent: string
+    confidence: number
+    needs_multiple_agents: boolean
+  }
+  individualResponses?: Array<{
+    success: boolean
+    response: string
+    agent_used: string
+  }>
 }
 
 interface Conversation {
@@ -33,14 +51,18 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      content: 'Hello! I\'m Apex, your confidential AI companion. I\'m here to help you with policies, rights, procedures, and any workplace concerns. How can I assist you today?',
+      content: 'Hello! I\'m APEX, your intelligent legal assistant powered by specialized AI agents. I coordinate with legal experts (Athena), emotional support specialists (ASHA), and document generators (Scribe) to provide comprehensive help. How can I assist you today?',
       sender: 'ai',
       timestamp: new Date(),
+      agentUsed: 'orchestrator',
+      workflowType: 'greeting'
     }
   ])
   const [inputValue, setInputValue] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [currentConversationId, setCurrentConversationId] = useState<string | null>(null)
+  const [isAnonymous, setIsAnonymous] = useState(true)
   const [conversations] = useState<Conversation[]>([
     {
       id: '1',
@@ -87,77 +109,149 @@ export default function ChatPage() {
     }
 
     setMessages(prev => [...prev, newMessage])
+    const messageContent = inputValue
     setInputValue('')
     setIsLoading(true)
 
-    // Simulate AI response
-    setTimeout(() => {
+    try {
+      // Send message to orchestrator backend
+      const response: ChatResponse = await apiClient.sendChatMessage({
+        message: messageContent,
+        conversation_id: currentConversationId || undefined,
+        anonymous: isAnonymous
+      })
+
+      // Update conversation ID if this is the first message
+      if (!currentConversationId) {
+        setCurrentConversationId(response.conversation_id)
+      }
+
       const aiResponse: Message = {
-        id: (Date.now() + 1).toString(),
-        content: generateAIResponse(inputValue),
+        id: response.conversation_id + '_' + Date.now(),
+        content: response.response,
         sender: 'ai',
         timestamp: new Date(),
-        type: inputValue.toLowerCase().includes('harassment') || inputValue.toLowerCase().includes('complaint') ? 'buttons' : 'text',
-        buttons: inputValue.toLowerCase().includes('harassment') || inputValue.toLowerCase().includes('complaint') ? [
-          { label: 'Learn my legal rights (POSH Act)', action: 'legal_rights' },
-          { label: 'File a formal complaint', action: 'file_complaint' },
-          { label: 'Contact a wellness counselor', action: 'counselor' },
-          { label: 'Practice how to respond', action: 'practice' }
-        ] : undefined
+        agentUsed: response.agent_used,
+        workflowType: response.workflow_type,
+        conversationState: response.conversation_state,
+        intentAnalysis: response.intent_analysis,
+        individualResponses: response.individual_responses,
+        type: shouldShowButtons(messageContent, response) ? 'buttons' : 'text',
+        buttons: shouldShowButtons(messageContent, response) ? generateActionButtons(messageContent, response) : undefined
       }
 
       setMessages(prev => [...prev, aiResponse])
+    } catch (error) {
+      console.error('Error sending message:', error)
+      
+      // Fallback error message
+      const errorResponse: Message = {
+        id: (Date.now() + 1).toString(),
+        content: 'I apologize, but I\'m having trouble connecting to my backend services right now. Please try again in a moment. If the issue persists, our system may be temporarily unavailable.',
+        sender: 'ai',
+        timestamp: new Date(),
+        agentUsed: 'error',
+        workflowType: 'error'
+      }
+
+      setMessages(prev => [...prev, errorResponse])
+    } finally {
       setIsLoading(false)
-    }, 1500)
+    }
   }
 
-  const generateAIResponse = (userMessage: string): string => {
+  const shouldShowButtons = (userMessage: string, response: ChatResponse): boolean => {
+    const message = userMessage.toLowerCase()
+    return (
+      message.includes('harassment') || 
+      message.includes('complaint') ||
+      message.includes('posh') ||
+      response.intent_analysis?.needs_multiple_agents ||
+      response.workflow_type === 'multi_agent'
+    )
+  }
+
+  const generateActionButtons = (userMessage: string, response: ChatResponse) => {
     const message = userMessage.toLowerCase()
     
-    if (message.includes('maternity') || message.includes('leave')) {
-      return "I can help you with maternity leave information. Under the Maternity Benefit Act, 1961, you're entitled to 26 weeks of paid maternity leave. Would you like me to help you generate a maternity leave application or provide more details about your benefits?"
+    if (message.includes('harassment') || message.includes('complaint') || message.includes('posh')) {
+      return [
+        { label: 'Learn my legal rights (POSH Act)', action: 'legal_rights' },
+        { label: 'File a formal complaint', action: 'file_complaint' },
+        { label: 'Contact emotional support', action: 'counselor' },
+        { label: 'Generate complaint letter', action: 'generate_complaint' }
+      ]
     }
     
-    if (message.includes('transfer')) {
-      return "I can assist you with transfer-related queries. There are several types of transfers available including spouse ground transfer, medical ground transfer, and general transfers. What specific information do you need about the transfer process?"
+    if (message.includes('maternity')) {
+      return [
+        { label: 'Check maternity rights', action: 'maternity_rights' },
+        { label: 'Generate leave application', action: 'generate_maternity_app' },
+        { label: 'Get emotional support', action: 'maternity_support' },
+        { label: 'View benefits calculator', action: 'benefits_calc' }
+      ]
     }
     
-    if (message.includes('harassment') || message.includes('complaint')) {
-      return "I understand this is a sensitive matter, and I'm here to support you. You have several options available, and everything we discuss is confidential. Here are some ways I can help:"
+    if (response.workflow_type === 'multi_agent') {
+      return [
+        { label: 'Get more legal details', action: 'more_legal' },
+        { label: 'Access emotional support', action: 'emotional_help' },
+        { label: 'Generate documents', action: 'create_docs' },
+        { label: 'View related resources', action: 'resources' }
+      ]
     }
     
-    if (message.includes('policy') || message.includes('rule')) {
-      return "I have access to a comprehensive database of government policies and rules. Could you please specify which policy or area you'd like information about? For example: POSH Act, Child Care Leave, Transfer Guidelines, etc."
-    }
-    
-    return "Thank you for your question. I'm here to help with policies, procedures, legal rights, and any workplace concerns. Could you provide more details about what specific information you're looking for?"
+    return undefined
   }
 
-  const handleButtonClick = (action: string) => {
-    let response = ''
+
+
+  const handleButtonClick = async (action: string) => {
+    let message = ''
+    
     switch (action) {
       case 'legal_rights':
-        response = "Under the POSH Act 2013, you have the right to a workplace free from sexual harassment. Key protections include: 1) Right to file a complaint with the Internal Committee, 2) Right to confidentiality, 3) Protection against retaliation, 4) Right to interim relief during inquiry. Would you like me to generate a formal complaint form or provide more detailed information?"
+        message = "Please provide detailed information about my legal rights under the POSH Act"
         break
       case 'file_complaint':
-        response = "I can help you prepare a formal complaint. Would you like this to be anonymous? I'll guide you through the process step by step and help you gather all necessary information and documentation."
+        message = "I need help filing a formal complaint. Can you guide me through the process?"
         break
       case 'counselor':
-        response = "I can connect you with confidential counseling resources. Would you prefer: 1) Internal employee assistance program, 2) External professional counselors, or 3) Peer support groups? All options maintain complete confidentiality."
+      case 'emotional_help':
+        message = "I need emotional support and counseling for my workplace situation"
         break
-      case 'practice':
-        response = "I can help you practice different response scenarios. This can include: 1) How to document incidents, 2) Professional communication scripts, 3) Assertiveness techniques. What specific situation would you like to practice for?"
+      case 'generate_complaint':
+        message = "Please generate a formal complaint letter for workplace harassment"
         break
+      case 'maternity_rights':
+        message = "What are my complete maternity leave rights and benefits?"
+        break
+      case 'generate_maternity_app':
+        message = "Generate a maternity leave application for me"
+        break
+      case 'maternity_support':
+        message = "I need emotional support during my pregnancy and maternity leave"
+        break
+      case 'more_legal':
+        message = "I need more detailed legal information about my situation"
+        break
+      case 'create_docs':
+        message = "Help me create the necessary documents for my case"
+        break
+      case 'resources':
+        message = "Show me relevant resources and information for my situation"
+        break
+      default:
+        message = `Help me with: ${action.replace('_', ' ')}`
     }
     
-    const aiResponse: Message = {
-      id: Date.now().toString(),
-      content: response,
-      sender: 'ai',
-      timestamp: new Date(),
-    }
+    // Simulate clicking the message by setting input and sending
+    setInputValue(message)
     
-    setMessages(prev => [...prev, aiResponse])
+    // Auto-send the message
+    setTimeout(() => {
+      sendMessage()
+    }, 100)
   }
 
   const handleFileUpload = () => {
@@ -165,11 +259,12 @@ export default function ChatPage() {
   }
 
   const quickActions = [
-    'How do I apply for maternity leave?',
-    'What are my rights under POSH Act?',
-    'I need help with a transfer request',
-    'How do I report a workplace issue?',
-    'What documents do I need for Child Care Leave?'
+    'I\'m being harassed at work and need comprehensive help',
+    'What are my maternity leave rights and how do I apply?',
+    'I need both legal advice and emotional support for my situation',
+    'Generate a workplace complaint letter with legal guidance',
+    'Help me understand my transfer rights and create documents',
+    'I\'m facing workplace discrimination - what are my options?'
   ]
 
   return (
@@ -222,6 +317,11 @@ export default function ChatPage() {
               </Card>
             ))}
           </div>
+          
+          {/* Agent Status */}
+          <div className="mt-6">
+            <AgentStatus />
+          </div>
         </div>
       </div>
 
@@ -245,8 +345,33 @@ export default function ChatPage() {
         <div className="bg-white border-b border-gray-200 p-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="font-semibold text-gray-900">Apex AI Assistant</h1>
-              <p className="text-sm text-green-600">● Online</p>
+              <h1 className="font-semibold text-gray-900">APEX AI Assistant</h1>
+              <p className="text-sm text-green-600">● Orchestrator Online</p>
+            </div>
+            <div className="flex items-center space-x-3">
+              <div className="flex items-center space-x-2">
+                <label htmlFor="anonymous-toggle" className="text-sm text-gray-600">
+                  Anonymous Mode
+                </label>
+                <button
+                  id="anonymous-toggle"
+                  onClick={() => setIsAnonymous(!isAnonymous)}
+                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                    isAnonymous ? 'bg-purple-600' : 'bg-gray-300'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                      isAnonymous ? 'translate-x-5' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+              {currentConversationId && (
+                <span className="text-xs text-gray-500">
+                  Session: {currentConversationId.slice(-8)}
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -260,7 +385,41 @@ export default function ChatPage() {
                   ? 'bg-primary-600 text-white' 
                   : 'bg-white border border-gray-200 text-gray-900'
               }`}>
+                {/* Agent and Workflow Info for AI messages */}
+                {message.sender === 'ai' && message.agentUsed && (
+                  <div className="flex items-center space-x-2 mb-2 text-xs">
+                    <CpuChipIcon className="h-3 w-3" />
+                    <span className={getIntentColor(message.intentAnalysis?.primary_intent)}>
+                      {formatAgentName(message.agentUsed)}
+                    </span>
+                    {message.workflowType && (
+                      <>
+                        <span className="text-gray-400">•</span>
+                        <span className="text-gray-600">
+                          {getWorkflowDescription(message.workflowType)}
+                        </span>
+                      </>
+                    )}
+                    {message.intentAnalysis?.needs_multiple_agents && (
+                      <CheckCircleIcon className="h-3 w-3 text-green-500" title="Multi-agent coordination" />
+                    )}
+                  </div>
+                )}
+                
                 <p className="text-sm">{message.content}</p>
+                
+                {/* Individual responses for multi-agent workflows */}
+                {message.individualResponses && message.individualResponses.length > 1 && (
+                  <div className="mt-3 p-2 bg-gray-50 rounded text-xs">
+                    <p className="font-medium text-gray-700 mb-1">Specialist Contributions:</p>
+                    {message.individualResponses.map((resp, index) => (
+                      <div key={index} className="flex items-center space-x-1 text-gray-600">
+                        <span className="w-2 h-2 bg-green-400 rounded-full"></span>
+                        <span>{formatAgentName(resp.agent_used)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 
                 {message.buttons && (
                   <div className="mt-3 space-y-2">
@@ -278,9 +437,16 @@ export default function ChatPage() {
                   </div>
                 )}
                 
-                <p className="text-xs opacity-70 mt-1">
-                  {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </p>
+                <div className="flex items-center justify-between mt-1">
+                  <p className="text-xs opacity-70">
+                    {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                  {message.intentAnalysis && (
+                    <p className="text-xs opacity-60">
+                      {Math.round(message.intentAnalysis.confidence * 100)}% confidence
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
           ))}

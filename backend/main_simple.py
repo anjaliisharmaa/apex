@@ -86,6 +86,7 @@ def get_orchestrator_agent():
 # API Endpoints
 
 @app.get("/")
+@app.get("/api/")  # Handle Next.js api prefix for health check
 async def root():
     """Health check endpoint"""
     return {
@@ -100,6 +101,7 @@ async def root():
     }
 
 @app.post("/api/chat", response_model=ChatResponse)
+@app.post("/api/api/chat", response_model=ChatResponse)  # Handle double prefix
 async def chat_endpoint(request: ChatRequest):
     """
     Main chat endpoint - routes messages to appropriate agent
@@ -150,6 +152,7 @@ async def chat_endpoint(request: ChatRequest):
         raise HTTPException(status_code=500, detail=f"Chat processing error: {str(e)}")
 
 @app.post("/api/forms/generate", response_model=DocumentResponse)
+@app.post("/api/api/forms/generate", response_model=DocumentResponse)  # Handle double prefix
 async def generate_document(request: DocumentRequest):
     """
     Document generation endpoint - uses Orchestrator with Scribe specialization
@@ -239,6 +242,7 @@ async def get_resources():
     }
 
 @app.get("/api/agents/status")
+@app.get("/api/api/agents/status")  # Handle double prefix
 async def get_agents_status():
     """
     Get status of orchestrator and all sub-agents
