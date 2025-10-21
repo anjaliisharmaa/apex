@@ -10,14 +10,24 @@ import os
 import sys
 from datetime import datetime
 from typing import Dict, List, Optional, Any
-from fastapi import FastAPI, HTTPException, UploadFile, File, BackgroundTasks
+from fastapi import FastAPI, HTTPException, UploadFile, File, BackgroundTasks, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
+from dotenv import load_dotenv
 import uvicorn
 import json
 
+# Load environment variables
+load_dotenv()
+
 # Add current directory to path for imports
 sys.path.insert(0, os.path.dirname(__file__))
+
+# Import database components
+from database.database import get_db, engine
+from database.models import Base
+from database import models
 
 # Import the agents
 try:
@@ -44,10 +54,17 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# Create database tables
+Base.metadata.create_all(bind=engine)
+
 # CORS middleware for frontend connection
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],  # Next.js frontend
+    allow_origins=[
+        os.getenv("FRONTEND_URL", "http://localhost:3000"),
+        "http://localhost:3000", 
+        "http://127.0.0.1:3000"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -212,12 +229,52 @@ async def root():
     return {
         "message": "APEX Legal Assistant API",
         "status": "running",
+        "database": "connected",
         "agents": {
             "asha": "emotional support",
             "athena": "legal assistance", 
             "scribe": "document generation"
         }
     }
+
+@app.get("/health")
+async def health_check(db: Session = Depends(get_db)):
+    """Health check endpoint that also verifies database connectivity"""
+    try:
+        # Test database connection
+        db.execute("SELECT 1")
+        return {
+            "status": "healthy",
+            "database": "connected",
+            "message": "All systems operational"
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Database connection failed: {str(e)}"
+        )
+
+@app.get("/api/test-db")
+async def test_database(db: Session = Depends(get_db)):
+    """Test endpoint to verify database models"""
+    try:
+        # Count users (should be 0 initially)
+        user_count = db.query(models.User).count()
+        case_count = db.query(models.Case).count()
+        
+        return {
+            "status": "success",
+            "message": "Database models working correctly",
+            "data": {
+                "users": user_count,
+                "cases": case_count
+            }
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Database query failed: {str(e)}"
+        )
 
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat_endpoint(request: ChatRequest):
