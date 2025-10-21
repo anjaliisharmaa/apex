@@ -86,6 +86,22 @@ class OrchestratorAgent:
         self._load_conversation_patterns()
         
         print("🎯 Orchestrator Agent initialized - Ready for intelligent coordination")
+        
+        # Preload Athena agent for faster responses (documents cached)
+        self.preload_athena_agent()
+    
+    def preload_athena_agent(self):
+        """Preload Athena agent to cache documents for faster responses"""
+        try:
+            print("🚀 Preloading Athena agent for optimized performance...")
+            athena = self._get_athena_agent()
+            if athena and athena.is_ready():
+                print("✅ Athena agent preloaded with cached documents - ready for fast queries!")
+            else:
+                print("⚠️ Athena agent loaded but documents may need initialization on first query")
+        except Exception as e:
+            print(f"⚠️ Could not preload Athena agent: {e}")
+            print("   📝 Athena will be loaded on-demand during first legal query")
     
     def _load_conversation_patterns(self):
         """Load conversation patterns and workflow definitions"""
@@ -498,6 +514,56 @@ class OrchestratorAgent:
             del self.sessions[session_id]
         
         print(f"🧹 Cleaned up {len(old_sessions)} old sessions")
+    
+    def get_all_agents_status(self):
+        """Get status of all agents including their readiness"""
+        status = {
+            "orchestrator": {
+                "status": "ready",
+                "sessions_active": len(self.sessions),
+                "description": "Coordination agent managing all specialists"
+            }
+        }
+        
+        # Check Athena status
+        try:
+            athena = self._get_athena_agent()
+            if athena:
+                athena_status = athena.get_status()
+                status["athena"] = {
+                    "status": athena_status["status"],
+                    "documents_loaded": athena_status["documents_loaded"],
+                    "embeddings_ready": athena_status["embeddings_ready"],
+                    "description": "Legal guidance specialist with document analysis"
+                }
+            else:
+                status["athena"] = {
+                    "status": "not_loaded",
+                    "description": "Legal guidance specialist (loading on demand)"
+                }
+        except Exception as e:
+            status["athena"] = {
+                "status": "error",
+                "error": str(e),
+                "description": "Legal guidance specialist (error)"
+            }
+        
+        # Check ASHA and Scribe (basic status)
+        for agent_name, getter in [("asha", self._get_asha_agent), ("scribe", self._get_scribe_agent)]:
+            try:
+                agent = getter()
+                status[agent_name] = {
+                    "status": "ready" if agent else "not_loaded",
+                    "description": f"{agent_name.upper()} specialist"
+                }
+            except Exception as e:
+                status[agent_name] = {
+                    "status": "error", 
+                    "error": str(e),
+                    "description": f"{agent_name.upper()} specialist (error)"
+                }
+        
+        return status
 
 
 # Convenience function for simple usage

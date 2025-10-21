@@ -253,9 +253,20 @@ async def get_resources():
 @app.get("/api/api/agents/status")  # Handle double prefix
 async def get_agents_status():
     """
-    Get status of orchestrator and all sub-agents
+    Get detailed status of orchestrator and all sub-agents
     """
     orchestrator = get_orchestrator_agent()
+    
+    if orchestrator and orchestrator != 'failed':
+        try:
+            # Get detailed status from orchestrator
+            return orchestrator.get_all_agents_status()
+        except Exception as e:
+            print(f"Error getting detailed agent status: {e}")
+            # Fallback to basic status
+            pass
+    
+    # Fallback basic status if orchestrator not available
     orchestrator_status = "available" if orchestrator and orchestrator != 'failed' else "failed"
     
     return {

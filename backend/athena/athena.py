@@ -22,7 +22,20 @@ class AthenaAgent:
     Provides legal guidance based on uploaded documents
     """
     
+    _instance = None
+    _initialized = False
+    
+    def __new__(cls):
+        """Singleton pattern to ensure only one instance with loaded documents"""
+        if cls._instance is None:
+            cls._instance = super(AthenaAgent, cls).__new__(cls)
+        return cls._instance
+    
     def __init__(self):
+        # Skip initialization if already done
+        if AthenaAgent._initialized:
+            return
+            
         # Load API key from environment or file
         print("🔑 Loading API key...")
         self.api_key = self.load_api_key()
@@ -50,8 +63,27 @@ class AthenaAgent:
         print("🔄 Testing API connection...")
         self.test_api_connection()
         
+        # Initialize RAG system once
+        print("🚀 Initializing RAG system (one-time setup)...")
+        self.initialize_rag_system()
+        
+        # Mark as initialized
+        AthenaAgent._initialized = True
+        print("✅ Athena agent fully initialized and ready!")
+    
+    def initialize_rag_system(self):
+        """Initialize the RAG system by loading documents and creating embeddings (one-time setup)"""
+        # Check if already initialized
+        if self.document_chunks and self.faiss_index is not None:
+            print("✅ RAG system already initialized - using cached documents!")
+            return
+            
+        print("🔧 Starting one-time RAG system initialization...")
+        
         # Load and process documents
         self.load_documents()
+        
+        print("✅ RAG system initialization complete! Documents cached for fast retrieval.")
         
         # System prompt for Athena
         self.system_prompt = """
@@ -92,6 +124,27 @@ class AthenaAgent:
         """
         
         self.conversation_history = []
+    
+    def is_ready(self):
+        """Check if the agent is ready to process queries (documents loaded)"""
+        return (self.document_chunks and 
+                self.faiss_index is not None and 
+                AthenaAgent._initialized)
+    
+    def get_status(self):
+        """Get the current status of the agent"""
+        if self.is_ready():
+            return {
+                "status": "ready",
+                "documents_loaded": len(self.document_chunks),
+                "embeddings_ready": self.faiss_index is not None
+            }
+        else:
+            return {
+                "status": "initializing",
+                "documents_loaded": 0,
+                "embeddings_ready": False
+            }
     
     def load_api_key(self):
         """Load API key from environment or .env file"""
@@ -270,6 +323,13 @@ class AthenaAgent:
             str: Athena's response with legal guidance
         """
         try:
+            # Ensure RAG system is ready (should be fast after first initialization)
+            if not self.is_ready():
+                print("⚠️ Athena RAG system not ready, initializing...")
+                self.initialize_rag_system()
+            else:
+                print("⚡ Athena using cached documents for fast response")
+            
             # Retrieve relevant context from documents
             context = self.retrieve_relevant_context(user_query, top_k=5)
             
