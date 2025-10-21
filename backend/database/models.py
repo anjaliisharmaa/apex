@@ -93,7 +93,7 @@ class Case(Base):
     due_date = Column(DateTime(timezone=True))
     
     # Additional metadata
-    metadata = Column(JSON)  # For flexible additional data
+    extra_data = Column(JSON)  # For flexible additional data
     
     # Relationships
     user = relationship("User", back_populates="cases")
@@ -177,7 +177,7 @@ class Message(Base):
     timestamp = Column(DateTime(timezone=True), server_default=func.now())
     
     # Message metadata
-    metadata = Column(JSON)  # For additional message data
+    extra_data = Column(JSON)  # For additional message data
     
     # Relationship
     conversation = relationship("Conversation", back_populates="messages")
