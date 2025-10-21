@@ -42,6 +42,10 @@ class ChatResponse(BaseModel):
     agent_used: str
     conversation_id: str
     timestamp: str
+    workflow_type: Optional[str] = None
+    conversation_state: Optional[str] = None
+    intent_analysis: Optional[Dict[str, Any]] = None
+    individual_responses: Optional[List[Dict[str, Any]]] = None
 
 class DocumentRequest(BaseModel):
     document_type: str
@@ -145,7 +149,11 @@ async def chat_endpoint(request: ChatRequest):
             response=response,
             agent_used=agent_used,
             conversation_id=conversation_id,
-            timestamp=datetime.now().isoformat()
+            timestamp=datetime.now().isoformat(),
+            workflow_type=result.get("workflow_type"),
+            conversation_state=result.get("conversation_state"),
+            intent_analysis=result.get("intent_analysis"),
+            individual_responses=result.get("individual_responses")
         )
         
     except Exception as e:

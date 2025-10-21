@@ -87,7 +87,9 @@ class APEXAPIClient {
       throw new Error(`API Error: ${response.status} ${response.statusText}`);
     }
 
-    return response.json();
+    const data = await response.json();
+    console.log('API Response data:', data); // Debug log to see actual response
+    return data;
   }
 
   /**

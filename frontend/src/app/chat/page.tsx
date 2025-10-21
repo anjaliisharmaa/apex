@@ -121,6 +121,8 @@ export default function ChatPage() {
         anonymous: isAnonymous
       })
 
+      console.log('Received chat response:', response); // Debug log
+
       // Update conversation ID if this is the first message
       if (!currentConversationId) {
         setCurrentConversationId(response.conversation_id)
@@ -132,10 +134,14 @@ export default function ChatPage() {
         sender: 'ai',
         timestamp: new Date(),
         agentUsed: response.agent_used,
-        workflowType: response.workflow_type,
-        conversationState: response.conversation_state,
-        intentAnalysis: response.intent_analysis,
-        individualResponses: response.individual_responses,
+        workflowType: response.workflow_type || 'single_agent',
+        conversationState: response.conversation_state || 'greeting',
+        intentAnalysis: response.intent_analysis || {
+          primary_intent: 'general',
+          confidence: 0.5,
+          needs_multiple_agents: false
+        },
+        individualResponses: response.individual_responses || [],
         type: shouldShowButtons(messageContent, response) ? 'buttons' : 'text',
         buttons: shouldShowButtons(messageContent, response) ? generateActionButtons(messageContent, response) : undefined
       }
@@ -144,10 +150,24 @@ export default function ChatPage() {
     } catch (error) {
       console.error('Error sending message:', error)
       
+      // More detailed error message based on error type
+      let errorMessage = 'I apologize, but I\'m having trouble connecting to my backend services right now. Please try again in a moment.'
+      
+      if (error instanceof Error) {
+        console.error('Detailed error:', error.message)
+        if (error.message.includes('response format') || error.message.includes('structure')) {
+          errorMessage = 'Unexpected response format from API. The response structure has changed.'
+        } else if (error.message.includes('404')) {
+          errorMessage = 'Service endpoint not found. Please check if the backend is running.'
+        } else if (error.message.includes('500')) {
+          errorMessage = 'Internal server error. The backend service encountered an issue.'
+        }
+      }
+      
       // Fallback error message
       const errorResponse: Message = {
         id: (Date.now() + 1).toString(),
-        content: 'I apologize, but I\'m having trouble connecting to my backend services right now. Please try again in a moment. If the issue persists, our system may be temporarily unavailable.',
+        content: errorMessage,
         sender: 'ai',
         timestamp: new Date(),
         agentUsed: 'error',
