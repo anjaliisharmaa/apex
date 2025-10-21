@@ -58,6 +58,34 @@ export interface AgentStatus {
   };
 }
 
+// Authentication interfaces
+export interface UserRegister {
+  username: string;
+  email: string;
+  password: string;
+  full_name?: string;
+}
+
+export interface UserLogin {
+  username: string;
+  password: string;
+}
+
+export interface Token {
+  access_token: string;
+  token_type: string;
+  expires_in: number;
+}
+
+export interface UserResponse {
+  id: number;
+  username: string;
+  email: string;
+  full_name?: string;
+  is_active: boolean;
+  created_at: string;
+}
+
 class APEXAPIClient {
   private baseURL: string;
 
@@ -72,10 +100,16 @@ class APEXAPIClient {
     const url = `${this.baseURL}${endpoint}`;
     console.log('Making API request to:', url); // Debug log
     
-    const defaultHeaders = {
+    const defaultHeaders: Record<string, string> = {
       'Content-Type': 'application/json',
-      ...options.headers,
+      ...(options.headers as Record<string, string>),
     };
+
+    // Add JWT token if available
+    const token = this.getStoredToken();
+    if (token) {
+      defaultHeaders['Authorization'] = `Bearer ${token}`;
+    }
 
     const response = await fetch(url, {
       ...options,
@@ -90,6 +124,26 @@ class APEXAPIClient {
     const data = await response.json();
     console.log('API Response data:', data); // Debug log to see actual response
     return data;
+  }
+
+  // Token management methods
+  private getStoredToken(): string | null {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('apex_auth_token');
+    }
+    return null;
+  }
+
+  private setStoredToken(token: string): void {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('apex_auth_token', token);
+    }
+  }
+
+  private removeStoredToken(): void {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('apex_auth_token');
+    }
   }
 
   /**
@@ -159,6 +213,60 @@ class APEXAPIClient {
    */
   async healthCheck(): Promise<any> {
     return this.request('/');
+  }
+
+  // Authentication methods
+  /**
+   * Register a new user
+   */
+  async register(userData: UserRegister): Promise<UserResponse> {
+    return this.request<UserResponse>('/api/register', {
+      method: 'POST',
+      body: JSON.stringify(userData),
+    });
+  }
+
+  /**
+   * Login user
+   */
+  async login(credentials: UserLogin): Promise<Token> {
+    const token = await this.request<Token>('/api/login', {
+      method: 'POST',
+      body: JSON.stringify(credentials),
+    });
+    
+    // Store token in localStorage
+    this.setStoredToken(token.access_token);
+    return token;
+  }
+
+  /**
+   * Logout user
+   */
+  async logout(): Promise<any> {
+    try {
+      const result = await this.request('/api/logout', {
+        method: 'POST',
+      });
+      return result;
+    } finally {
+      // Always remove token, even if API call fails
+      this.removeStoredToken();
+    }
+  }
+
+  /**
+   * Get current user profile
+   */
+  async getUserProfile(): Promise<UserResponse> {
+    return this.request<UserResponse>('/api/user/profile');
+  }
+
+  /**
+   * Check if user is authenticated
+   */
+  isAuthenticated(): boolean {
+    return this.getStoredToken() !== null;
   }
 }
 
