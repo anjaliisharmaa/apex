@@ -8,7 +8,8 @@ Provides REST API endpoints for the frontend application
 
 import os
 import sys
-from datetime import datetime, timedelta
+import uuid
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Any, Union
 from fastapi import FastAPI, HTTPException, UploadFile, File, BackgroundTasks, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -154,9 +155,9 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     """Create a JWT access token"""
     to_encode = data.copy()
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = datetime.now(timezone.utc) + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
@@ -357,13 +358,21 @@ async def login_user(user_credentials: UserLogin, db: Session = Depends(get_db))
             data={"sub": user.email}, expires_delta=access_token_expires
         )
         
-        # Create user session record
+        # Clean up old sessions for this user
+        db.query(models.UserSession).filter(
+            models.UserSession.user_id == user.id,
+            models.UserSession.is_active == True
+        ).update({"is_active": False})
+        db.commit()
+        
+        # Create user session record with unique session token
+        unique_session_token = f"{access_token[:24]}_{str(uuid.uuid4())[:8]}"
         session = models.UserSession(
             user_id=user.id,
-            session_token=access_token[:32],  # Store partial token for tracking
+            session_token=unique_session_token,  # Use unique token
             ip_address="unknown",  # Can be enhanced to get real IP
             user_agent="unknown",  # Can be enhanced to get real user agent
-            expires_at=datetime.utcnow() + access_token_expires,
+            expires_at=datetime.now(timezone.utc) + access_token_expires,
             is_active=True
         )
         db.add(session)
