@@ -40,11 +40,9 @@ export default function LoginPage() {
     setIsLoading(true);
     
     try {
-      // Use email as username for now (backend expects username)
-      const username = email.split('@')[0]; // Use part before @ as username
-      
+      // Use email directly as username since backend expects email
       await apiClient.login({
-        username: username,
+        username: email,  // Use full email as username
         password: password
       });
       

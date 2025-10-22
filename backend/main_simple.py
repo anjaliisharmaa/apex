@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from dotenv import load_dotenv
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, field_validator
 import uvicorn
 import json
 from passlib.context import CryptContext
@@ -96,7 +96,8 @@ class UserRegister(BaseModel):
     password: str
     full_name: Optional[str] = None
     
-    @validator('email')
+    @field_validator('email')
+    @classmethod
     def validate_email(cls, v):
         import re
         email_regex = r'^[^\s@]+@[^\s@]+\.[^\s@]+$'
@@ -104,7 +105,8 @@ class UserRegister(BaseModel):
             raise ValueError('Invalid email format')
         return v
     
-    @validator('password')
+    @field_validator('password')
+    @classmethod
     def validate_password(cls, v):
         if len(v) < 6:
             raise ValueError('Password must be at least 6 characters long')
@@ -161,16 +163,19 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     return encoded_jwt
 
 def get_user_by_username(db: Session, username: str):
-    """Get user by username from database"""
-    return db.query(models.User).filter(models.User.username == username).first()
+    """Get user by username from database - using email as username"""
+    return db.query(models.User).filter(models.User.email == username).first()
 
 def get_user_by_email(db: Session, email: str):
     """Get user by email from database"""
     return db.query(models.User).filter(models.User.email == email).first()
 
 def authenticate_user(db: Session, username: str, password: str):
-    """Authenticate user credentials"""
-    user = get_user_by_username(db, username)
+    """Authenticate user credentials - username can be email"""
+    user = get_user_by_email(db, username)  # Try email first
+    if not user:
+        # If not found by email, try to find by email field directly
+        user = get_user_by_username(db, username)
     if not user:
         return False
     if not verify_password(password, user.hashed_password):
@@ -284,16 +289,11 @@ async def test_database(db: Session = Depends(get_db)):
 
 # Authentication Endpoints
 @app.post("/api/register", response_model=UserResponse)
+@app.post("/api/api/register", response_model=UserResponse)  # Handle double prefix
 async def register_user(user_data: UserRegister, db: Session = Depends(get_db)):
     """Register a new user"""
     try:
         # Check if user already exists
-        if get_user_by_username(db, user_data.username):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Username already registered"
-            )
-        
         if get_user_by_email(db, user_data.email):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -303,12 +303,11 @@ async def register_user(user_data: UserRegister, db: Session = Depends(get_db)):
         # Create new user
         hashed_password = get_password_hash(user_data.password)
         db_user = models.User(
-            username=user_data.username,
             email=user_data.email,
-            full_name=user_data.full_name,
+            full_name=user_data.full_name or user_data.username,
             hashed_password=hashed_password,
             is_active=True,
-            is_verified=False
+            email_verified=False
         )
         
         db.add(db_user)
@@ -317,7 +316,7 @@ async def register_user(user_data: UserRegister, db: Session = Depends(get_db)):
         
         return UserResponse(
             id=db_user.id,
-            username=db_user.username,
+            username=db_user.email,  # Use email as username
             email=db_user.email,
             full_name=db_user.full_name,
             is_active=db_user.is_active,
@@ -334,6 +333,7 @@ async def register_user(user_data: UserRegister, db: Session = Depends(get_db)):
         )
 
 @app.post("/api/login", response_model=Token)
+@app.post("/api/api/login", response_model=Token)  # Handle double prefix
 async def login_user(user_credentials: UserLogin, db: Session = Depends(get_db)):
     """Authenticate user and return JWT token"""
     try:
@@ -354,7 +354,7 @@ async def login_user(user_credentials: UserLogin, db: Session = Depends(get_db))
         # Create access token
         access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
         access_token = create_access_token(
-            data={"sub": user.username}, expires_delta=access_token_expires
+            data={"sub": user.email}, expires_delta=access_token_expires
         )
         
         # Create user session record
@@ -404,11 +404,12 @@ async def logout_user(current_user: models.User = Depends(get_current_user), db:
         )
 
 @app.get("/api/user/profile", response_model=UserResponse)
+@app.get("/api/api/user/profile", response_model=UserResponse)  # Handle double prefix
 async def get_user_profile(current_user: models.User = Depends(get_current_user)):
     """Get current user profile"""
     return UserResponse(
         id=current_user.id,
-        username=current_user.username,
+        username=current_user.email,  # Use email as username
         email=current_user.email,
         full_name=current_user.full_name,
         is_active=current_user.is_active,
