@@ -395,16 +395,45 @@ class OrchestratorAgent:
             agent_name = response["agent_used"].upper()
             agent_response = response["response"]
             
+            # Clean up the response by removing excessive markdown
+            cleaned_response = self._clean_response_formatting(agent_response)
+            
             if agent_name == "ATHENA":
-                synthesis += f"**🏛️ Legal Guidance:**\n{agent_response}\n\n"
+                synthesis += f"Legal Guidance:\n{cleaned_response}\n\n"
             elif agent_name == "ASHA":
-                synthesis += f"**💚 Emotional Support:**\n{agent_response}\n\n"
+                synthesis += f"Emotional Support:\n{cleaned_response}\n\n"
             elif agent_name == "SCRIBE":
-                synthesis += f"**📝 Document Assistance:**\n{agent_response}\n\n"
+                synthesis += f"Document Assistance:\n{cleaned_response}\n\n"
         
-        synthesis += "---\n*This comprehensive response combines insights from multiple APEX specialists to address your situation holistically.*"
+        synthesis += "This comprehensive response combines insights from multiple APEX specialists to address your situation holistically."
         
         return synthesis
+    
+    def _clean_response_formatting(self, response: str) -> str:
+        """Clean up excessive markdown formatting from responses"""
+        import re
+        
+        # Remove excessive markdown headers (## and ###)
+        response = re.sub(r'^#{2,3}\s*', '', response, flags=re.MULTILINE)
+        
+        # Convert **bold** to simple bold formatting
+        response = re.sub(r'\*\*(.*?)\*\*', r'\1', response)
+        
+        # Remove emoji headers like 🏛️, 💚, 📝, etc.
+        response = re.sub(r'^[🏛️💚📝⚖️🔶📄🔄⏱️📋📞📚]\s*', '', response, flags=re.MULTILINE)
+        
+        # Clean up multiple asterisks and dashes
+        response = re.sub(r'\*{3,}', '---', response)
+        response = re.sub(r'-{4,}', '---', response)
+        response = re.sub(r'={4,}', '---', response)
+        
+        # Remove excessive newlines
+        response = re.sub(r'\n{3,}', '\n\n', response)
+        
+        # Clean up list formatting
+        response = re.sub(r'^[•✅🔶]\s*', '• ', response, flags=re.MULTILINE)
+        
+        return response.strip()
     
     def process_message(self, message: str, session_id: str, user_id: Optional[str] = None) -> Dict[str, Any]:
         """
