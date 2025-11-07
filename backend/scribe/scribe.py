@@ -10,9 +10,15 @@ import os
 import sys
 import json
 import requests
+import urllib.request
+import urllib.error
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 import re
+
+# Add the core directory to the path for importing response formatter
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'core'))
+from response_formatter import format_response_for_frontend
 
 class ScribeAgent:
     """
@@ -745,7 +751,8 @@ Please generate the requested content with appropriate formatting and tone:"""
                         
                         if 'content' in candidate and 'parts' in candidate['content']:
                             content = candidate['content']['parts'][0]['text']
-                            return f"📝 {content.strip()}"
+                            formatted_content = format_response_for_frontend(content.strip())
+                            return f"📝 {formatted_content}"
                         else:
                             return "❌ Unexpected API response format. Please try again."
                     else:

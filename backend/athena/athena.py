@@ -10,6 +10,12 @@ import json
 import urllib.request
 import urllib.parse
 import time
+import sys
+from datetime import datetime
+
+# Add the core directory to the path for importing response formatter
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'core'))
+from response_formatter import format_legal_response
 from datetime import datetime
 from typing import List, Dict, Any
 import PyPDF2
@@ -449,6 +455,9 @@ class AthenaAgent:
                             if 'content' in candidate and 'parts' in candidate['content']:
                                 athena_response = candidate['content']['parts'][0]['text']
                                 
+                                # Format the response for better readability
+                                formatted_response = format_legal_response(athena_response)
+                                
                                 # Add to conversation history
                                 self.conversation_history.append({
                                     "role": "user",
@@ -457,11 +466,11 @@ class AthenaAgent:
                                 })
                                 self.conversation_history.append({
                                     "role": "assistant",
-                                    "content": athena_response,
+                                    "content": formatted_response,
                                     "timestamp": datetime.now().isoformat()
                                 })
                                 
-                                total_time = time.time() - query_start
+                                return f"⚖️ {formatted_response}"
                                 print(f"⚡ Total response time: {total_time:.2f}s")
                                 return f"⚖️ {athena_response}"
                             else:

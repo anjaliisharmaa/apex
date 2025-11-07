@@ -9,6 +9,11 @@ import json
 import urllib.request
 import urllib.parse
 from datetime import datetime
+import sys
+
+# Add the core directory to the path for importing response formatter
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'core'))
+from response_formatter import format_emotional_response
 
 class AshaAgent:
     """
@@ -124,6 +129,9 @@ class AshaAgent:
                 if 'parts' in content and len(content['parts']) > 0:
                     asha_response = content['parts'][0]['text']
                     
+                    # Format the response for better readability
+                    formatted_response = format_emotional_response(asha_response)
+                    
                     # Add to conversation history
                     self.conversation_history.append({
                         "role": "user",
@@ -132,11 +140,11 @@ class AshaAgent:
                     })
                     self.conversation_history.append({
                         "role": "assistant",
-                        "content": asha_response,
+                        "content": formatted_response,
                         "timestamp": datetime.now().isoformat()
                     })
                     
-                    return asha_response
+                    return formatted_response
             
             return "I apologize, but I'm having trouble generating a response right now. Please try again."
             
