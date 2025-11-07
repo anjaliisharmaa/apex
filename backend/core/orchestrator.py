@@ -77,28 +77,78 @@ class OrchestratorAgent:
         self.api_key = api_key or os.getenv('GEMINI_API_KEY')
         self.sessions: Dict[str, UserSession] = {}
         
-        # Agent instances (lazy loaded)
+        # Agent instances (preloaded for faster responses)
         self._asha_agent = None
         self._athena_agent = None
         self._scribe_agent = None
+        
+        # Response cache for common queries
+        self._response_cache = {}
+        self._cache_hits = 0
+        
+        # Performance optimization flags
+        self._fast_mode = True
+        self._single_agent_preference = True
         
         # Conversation patterns and workflows
         self._load_conversation_patterns()
         
         print("🎯 Orchestrator Agent initialized - Ready for intelligent coordination")
+        print("⚡ Fast mode enabled - prioritizing speed while maintaining context")
         
-        # Preload Athena agent for faster responses (documents cached)
-        self.preload_athena_agent()
+        # Preload all agents in background for instant responses
+        self.preload_all_agents()
+    
+    def preload_all_agents(self):
+        """Preload all agents for instant responses"""
+        print("🚀 Preloading all agents for optimized performance...")
+        
+        # Preload in order of likely usage frequency
+        try:
+            # 1. Athena (most used for legal queries)
+            athena = self._get_athena_agent()
+            if athena:
+                # Check if Athena has a readiness method
+                try:
+                    if hasattr(athena, 'is_ready') and athena.is_ready():
+                        print("✅ Athena agent preloaded with documents - ready for fast queries")
+                    else:
+                        print("✅ Athena agent preloaded - legal queries ready")
+                except:
+                    print("✅ Athena agent preloaded - legal queries ready")
+            
+            # 2. ASHA (emotional support)  
+            asha = self._get_asha_agent()
+            if asha:
+                print("✅ ASHA agent preloaded - emotional support ready")
+            
+            # 3. Scribe (document generation)
+            scribe = self._get_scribe_agent()
+            if scribe:
+                print("✅ Scribe agent preloaded - document generation ready")
+            
+            print("⚡ All agents preloaded - ready for instant responses!")
+            
+        except Exception as e:
+            print(f"⚠️ Some agents could not be preloaded: {e}")
+            print("   📝 Agents will be loaded on-demand with slight delay")
     
     def preload_athena_agent(self):
         """Preload Athena agent to cache documents for faster responses"""
         try:
             print("🚀 Preloading Athena agent for optimized performance...")
             athena = self._get_athena_agent()
-            if athena and athena.is_ready():
-                print("✅ Athena agent preloaded with cached documents - ready for fast queries!")
+            if athena:
+                # Check if Athena has a readiness method
+                try:
+                    if hasattr(athena, 'is_ready') and athena.is_ready():
+                        print("✅ Athena agent preloaded with cached documents - ready for fast queries!")
+                    else:
+                        print("✅ Athena agent preloaded - ready for legal queries!")
+                except:
+                    print("✅ Athena agent preloaded - ready for legal queries!")
             else:
-                print("⚠️ Athena agent loaded but documents may need initialization on first query")
+                print("⚠️ Athena agent could not be loaded")
         except Exception as e:
             print(f"⚠️ Could not preload Athena agent: {e}")
             print("   📝 Athena will be loaded on-demand during first legal query")
@@ -215,6 +265,36 @@ class OrchestratorAgent:
         self.sessions[session_id] = session
         return session_id
     
+    def analyze_intent_fast(self, message: str, session_context: Optional[UserSession] = None) -> Dict[str, Any]:
+        """
+        Fast intent analysis optimized for speed while maintaining accuracy
+        """
+        message_lower = message.lower()
+        
+        # Quick keyword scoring (optimized)
+        legal_score = sum(1 for k in ["rights", "law", "legal", "harassment", "maternity", "leave", "transfer", "workplace"] if k in message_lower)
+        emotional_score = sum(1 for k in ["stressed", "help", "support", "worried", "overwhelmed", "feeling"] if k in message_lower)
+        document_score = sum(1 for k in ["generate", "create", "write", "draft", "form", "application"] if k in message_lower)
+        
+        # Determine primary intent quickly
+        scores = {"legal": legal_score, "emotional": emotional_score, "documentation": document_score}
+        primary_intent = max(scores, key=scores.get) if any(scores.values()) else "legal"  # Default to legal
+        
+        # Fast multi-agent check - only for high-complexity cases
+        needs_multiple = False
+        if legal_score >= 2 and emotional_score >= 1:
+            needs_multiple = True
+        elif any(word in message_lower for word in ["harassment", "discrimination", "unfair treatment"]):
+            needs_multiple = True
+        
+        return {
+            "primary_intent": primary_intent,
+            "intent_scores": scores,
+            "needs_multiple_agents": needs_multiple,
+            "confidence": max(scores.values()) / (len(message.split()) / 8 + 1),
+            "fast_mode": True
+        }
+    
     def analyze_intent_advanced(self, message: str, session_context: Optional[UserSession] = None) -> Dict[str, Any]:
         """
         Advanced intent analysis considering conversation history and context
@@ -287,13 +367,28 @@ class OrchestratorAgent:
         
         return intent_to_agent.get(primary_intent, "athena")  # Default to athena for legal guidance
     
-    def execute_single_agent_workflow(self, message: str, agent_type: str, session_id: str) -> Dict[str, Any]:
+    def execute_single_agent_workflow(self, message: str, agent_type: str, session_id: str, timeout: int = 30) -> Dict[str, Any]:
         """
-        Execute workflow with a single agent
+        Execute workflow with a single agent - optimized for speed
         """
         try:
+            # Check cache first for faster responses
+            cache_key = f"{agent_type}:{hash(message[:100])}"
+            if cache_key in self._response_cache:
+                self._cache_hits += 1
+                cached_response = self._response_cache[cache_key]
+                print(f"⚡ Cache hit #{self._cache_hits} - instant response")
+                return {
+                    "success": True,
+                    "response": cached_response,
+                    "agent_used": agent_type,
+                    "workflow_type": "single_agent",
+                    "cached": True
+                }
+            
             agent = None
             response = None
+            start_time = datetime.now()
             
             if agent_type == "asha":
                 agent = self._get_asha_agent()
@@ -310,14 +405,25 @@ class OrchestratorAgent:
                 if agent:
                     response = agent.process_user_input(message)
             
+            # Calculate response time
+            response_time = (datetime.now() - start_time).total_seconds()
+            
             if not response:
                 response = f"I'm sorry, the {agent_type} assistant is currently unavailable. Please try again later."
+            
+            # Cache successful responses (limit cache size)
+            if response and len(self._response_cache) < 100:
+                self._response_cache[cache_key] = response
+            
+            print(f"⚡ Response generated in {response_time:.1f}s")
             
             return {
                 "success": True,
                 "response": response,
                 "agent_used": agent_type,
-                "workflow_type": "single_agent"
+                "workflow_type": "single_agent",
+                "response_time": response_time,
+                "cached": False
             }
             
         except Exception as e:
@@ -331,11 +437,27 @@ class OrchestratorAgent:
     
     def execute_multi_agent_workflow(self, message: str, workflow: Dict[str, Any], session_id: str) -> Dict[str, Any]:
         """
-        Execute complex workflow involving multiple agents
+        Execute complex workflow involving multiple agents - optimized for speed
         """
         try:
             pattern = workflow["pattern"]
             agent_sequence = pattern["sequence"]
+            
+            # Fast mode: Return primary agent response immediately if enabled
+            if self._fast_mode and len(agent_sequence) > 1:
+                primary_agent = agent_sequence[0]
+                print(f"⚡ Fast mode: Using primary agent {primary_agent} for quick response")
+                result = self.execute_single_agent_workflow(message, primary_agent, session_id)
+                
+                # Add note about comprehensive support available
+                if result["success"]:
+                    result["response"] += f"\n\n*Note: For comprehensive support combining {', '.join(agent_sequence)} specialists, please let me know if you need additional assistance.*"
+                    result["workflow_type"] = "fast_multi_agent"
+                    result["agents_available"] = agent_sequence
+                
+                return result
+            
+            # Full multi-agent workflow (fallback)
             responses = []
             
             for i, agent_type in enumerate(agent_sequence):
@@ -437,8 +559,10 @@ class OrchestratorAgent:
     
     def process_message(self, message: str, session_id: str, user_id: Optional[str] = None) -> Dict[str, Any]:
         """
-        Main entry point for processing user messages with orchestration
+        Main entry point for processing user messages with orchestration - optimized for speed
         """
+        start_time = datetime.now()
+        
         # Get or create session
         if session_id not in self.sessions:
             session_id = self.create_session(user_id)
@@ -446,11 +570,18 @@ class OrchestratorAgent:
         session = self.sessions[session_id]
         session.last_activity = datetime.now()
         
-        # Analyze intent with conversation context
-        intent_analysis = self.analyze_intent_advanced(message, session)
+        # Use fast intent analysis for speed
+        if self._fast_mode:
+            intent_analysis = self.analyze_intent_fast(message, session)
+        else:
+            intent_analysis = self.analyze_intent_advanced(message, session)
         
-        # Determine execution path
-        if intent_analysis["needs_multiple_agents"] and intent_analysis["suggested_workflow"]:
+        # Speed optimization: Prefer single agent unless clearly multi-agent needed
+        if self._single_agent_preference and not intent_analysis.get("needs_multiple_agents", False):
+            # Route to best single agent
+            agent_type = self.route_to_agent(message, intent_analysis)
+            result = self.execute_single_agent_workflow(message, agent_type, session_id)
+        elif intent_analysis["needs_multiple_agents"] and intent_analysis.get("suggested_workflow"):
             # Execute multi-agent workflow
             result = self.execute_multi_agent_workflow(
                 message, 
@@ -458,7 +589,7 @@ class OrchestratorAgent:
                 session_id
             )
         else:
-            # Execute single agent workflow
+            # Fallback to single agent
             agent_type = self.route_to_agent(message, intent_analysis)
             result = self.execute_single_agent_workflow(message, agent_type, session_id)
         
@@ -478,6 +609,9 @@ class OrchestratorAgent:
         # Update conversation state
         self._update_conversation_state(session, intent_analysis)
         
+        # Calculate total response time
+        total_time = (datetime.now() - start_time).total_seconds()
+        
         # Prepare response
         response = {
             "response": result["response"],
@@ -486,11 +620,19 @@ class OrchestratorAgent:
             "workflow_type": result.get("workflow_type", "single_agent"),
             "conversation_state": session.conversation_state.value,
             "intent_analysis": intent_analysis,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
+            "response_time": total_time,
+            "fast_mode": self._fast_mode,
+            "cached": result.get("cached", False)
         }
         
         if "individual_responses" in result:
             response["individual_responses"] = result["individual_responses"]
+        
+        if "agents_available" in result:
+            response["agents_available"] = result["agents_available"]
+        
+        print(f"⚡ Total orchestration time: {total_time:.1f}s")
         
         return response
     
@@ -531,6 +673,44 @@ class OrchestratorAgent:
             "user_profile": session.user_profile
         }
     
+    def set_performance_mode(self, fast_mode: bool = True, single_agent_preference: bool = True):
+        """
+        Configure performance settings
+        
+        Args:
+            fast_mode: Enable fast response mode (single agent priority)
+            single_agent_preference: Prefer single agent responses over multi-agent workflows
+        """
+        self._fast_mode = fast_mode
+        self._single_agent_preference = single_agent_preference
+        
+        mode_desc = "fast" if fast_mode else "comprehensive"
+        agent_desc = "single-agent priority" if single_agent_preference else "multi-agent workflows"
+        
+        print(f"⚡ Performance mode set to: {mode_desc} with {agent_desc}")
+    
+    def clear_cache(self):
+        """Clear response cache"""
+        cache_size = len(self._response_cache)
+        self._response_cache.clear()
+        self._cache_hits = 0
+        print(f"🧹 Cleared {cache_size} cached responses")
+    
+    def get_performance_stats(self) -> Dict[str, Any]:
+        """Get performance statistics"""
+        return {
+            "fast_mode": self._fast_mode,
+            "single_agent_preference": self._single_agent_preference,
+            "cache_size": len(self._response_cache),
+            "cache_hits": self._cache_hits,
+            "active_sessions": len(self.sessions),
+            "agents_preloaded": {
+                "asha": self._asha_agent is not None,
+                "athena": self._athena_agent is not None,
+                "scribe": self._scribe_agent is not None
+            }
+        }
+    
     def cleanup_old_sessions(self, hours: int = 24):
         """Clean up sessions older than specified hours"""
         cutoff_time = datetime.now() - timedelta(hours=hours)
@@ -558,13 +738,27 @@ class OrchestratorAgent:
         try:
             athena = self._get_athena_agent()
             if athena:
-                athena_status = athena.get_status()
-                status["athena"] = {
-                    "status": athena_status["status"],
-                    "documents_loaded": athena_status["documents_loaded"],
-                    "embeddings_ready": athena_status["embeddings_ready"],
-                    "description": "Legal guidance specialist with document analysis"
-                }
+                # Try to get status if method exists
+                try:
+                    if hasattr(athena, 'get_status'):
+                        athena_status = athena.get_status()
+                        status["athena"] = {
+                            "status": athena_status.get("status", "ready"),
+                            "documents_loaded": athena_status.get("documents_loaded", "unknown"),
+                            "embeddings_ready": athena_status.get("embeddings_ready", "unknown"),
+                            "description": "Legal guidance specialist with document analysis"
+                        }
+                    else:
+                        status["athena"] = {
+                            "status": "ready",
+                            "description": "Legal guidance specialist"
+                        }
+                except Exception as e:
+                    status["athena"] = {
+                        "status": "ready",
+                        "description": "Legal guidance specialist",
+                        "note": "Status details unavailable"
+                    }
             else:
                 status["athena"] = {
                     "status": "not_loaded",

@@ -921,6 +921,11 @@ async def get_resources():
         }
     }
 
+# Performance Control Models
+class PerformanceSettings(BaseModel):
+    fast_mode: Optional[bool] = True
+    single_agent_preference: Optional[bool] = True
+
 @app.get("/api/agents/status")
 @app.get("/api/api/agents/status")  # Handle double prefix
 async def get_agents_status():
@@ -959,6 +964,82 @@ async def get_agents_status():
             "description": "Document generation and workflow assistant"
         }
     }
+
+@app.post("/api/agents/performance")
+@app.post("/api/api/agents/performance")  # Handle double prefix
+async def set_performance_mode(settings: PerformanceSettings):
+    """
+    Configure agent performance settings for faster responses
+    """
+    orchestrator = get_orchestrator_agent()
+    
+    if not orchestrator:
+        raise HTTPException(status_code=503, detail="Orchestrator service unavailable")
+    
+    try:
+        orchestrator.set_performance_mode(
+            fast_mode=settings.fast_mode,
+            single_agent_preference=settings.single_agent_preference
+        )
+        
+        # Get updated stats
+        stats = orchestrator.get_performance_stats()
+        
+        return {
+            "message": "Performance settings updated successfully",
+            "settings": {
+                "fast_mode": stats["fast_mode"],
+                "single_agent_preference": stats["single_agent_preference"]
+            },
+            "stats": stats
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update performance settings: {str(e)}")
+
+@app.get("/api/agents/performance")
+@app.get("/api/api/agents/performance")  # Handle double prefix
+async def get_performance_stats():
+    """
+    Get current performance statistics and settings
+    """
+    orchestrator = get_orchestrator_agent()
+    
+    if not orchestrator:
+        raise HTTPException(status_code=503, detail="Orchestrator service unavailable")
+    
+    try:
+        stats = orchestrator.get_performance_stats()
+        return {
+            "status": "success",
+            "performance_stats": stats,
+            "recommendations": {
+                "fast_mode": "Enable for responses under 10 seconds",
+                "single_agent_preference": "Enable to avoid multi-agent delays", 
+                "cache_usage": f"Cache hit rate: {stats['cache_hits']} hits"
+            }
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get performance stats: {str(e)}")
+
+@app.post("/api/agents/cache/clear")
+@app.post("/api/api/agents/cache/clear")  # Handle double prefix
+async def clear_agent_cache():
+    """
+    Clear response cache to free memory
+    """
+    orchestrator = get_orchestrator_agent()
+    
+    if not orchestrator:
+        raise HTTPException(status_code=503, detail="Orchestrator service unavailable")
+    
+    try:
+        orchestrator.clear_cache()
+        return {"message": "Agent cache cleared successfully"}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to clear cache: {str(e)}")
 
 @app.get("/api/conversations/{conversation_id}")
 async def get_conversation(conversation_id: str):
