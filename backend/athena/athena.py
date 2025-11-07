@@ -2,6 +2,7 @@
 """
 Athena Agent - Legal AI Assistant with RAG (Retrieval-Augmented Generation)
 This agent provides legal guidance using documents from athena_data/
+Optimized with pre-computed embeddings cache for instant initialization
 """
 
 import os
@@ -15,6 +16,15 @@ import re
 from sentence_transformers import SentenceTransformer
 import faiss
 import numpy as np
+import time
+
+# Import embeddings cache for fast initialization
+try:
+    from embeddings_cache import EmbeddingsCache
+    CACHE_AVAILABLE = True
+except ImportError:
+    print("⚠️ Embeddings cache not available - falling back to standard initialization")
+    CACHE_AVAILABLE = False
 
 class AthenaAgent:
     """
@@ -47,10 +57,6 @@ class AthenaAgent:
         # Gemini API endpoint - Using the latest available model (Gemini 2.5 Flash)
         self.api_url = f"https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key={self.api_key}"
         
-        # Initialize sentence transformer for embeddings
-        print("📚 Loading sentence transformer model...")
-        self.embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
-        
         # Data directory path
         self.data_dir = os.path.join(os.path.dirname(__file__), 'athena_data')
         
@@ -59,33 +65,79 @@ class AthenaAgent:
         self.chunk_embeddings = None
         self.faiss_index = None
         
+        # Initialize embeddings cache
+        if CACHE_AVAILABLE:
+            self.embeddings_cache = EmbeddingsCache(self.data_dir)
+        else:
+            self.embeddings_cache = None
+        
         # Test API connection
         print("🔄 Testing API connection...")
         self.test_api_connection()
         
-        # Initialize RAG system once
-        print("🚀 Initializing RAG system (one-time setup)...")
+        # Initialize RAG system with cache optimization
+        print("🚀 Initializing RAG system with cache optimization...")
+        start_time = time.time()
         self.initialize_rag_system()
+        init_time = time.time() - start_time
+        print(f"⚡ RAG system initialized in {init_time:.2f} seconds!")
         
         # Mark as initialized
         AthenaAgent._initialized = True
         print("✅ Athena agent fully initialized and ready!")
     
     def initialize_rag_system(self):
-        """Initialize the RAG system by loading documents and creating embeddings (one-time setup)"""
+        """Initialize the RAG system with cache optimization for instant loading"""
         # Check if already initialized
         if self.document_chunks and self.faiss_index is not None:
-            print("✅ RAG system already initialized - using cached documents!")
+            print("✅ RAG system already initialized - using existing data!")
             return
-            
-        print("🔧 Starting one-time RAG system initialization...")
+        
+        # Try to use cache for instant loading
+        if CACHE_AVAILABLE and self.embeddings_cache:
+            try:
+                # Use cache system for instant loading
+                print("⚡ Using embeddings cache for instant initialization...")
+                
+                self.document_chunks, self.chunk_embeddings, self.faiss_index = (
+                    self.embeddings_cache.get_or_create_embeddings()
+                )
+                
+                # Load embedding model only if we need it for queries (not for cache loading)
+                if not hasattr(self, 'embedding_model') or self.embedding_model is None:
+                    print("📚 Loading sentence transformer model for queries...")
+                    self.embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+                
+                print("✅ RAG system initialized with pre-computed embeddings!")
+                
+            except Exception as e:
+                print(f"⚠️ Cache loading failed: {e}")
+                print("🔄 Falling back to standard initialization...")
+                self.initialize_rag_system_fallback()
+        else:
+            print("🔄 Cache not available - using standard initialization...")
+            self.initialize_rag_system_fallback()
+        
+        # Initialize system prompt and conversation history
+        self.setup_system_prompt()
+        self.conversation_history = []
+        
+        print("✅ RAG system initialization complete!")
+    
+    def initialize_rag_system_fallback(self):
+        """Fallback initialization method (original approach)"""
+        print("🔧 Starting standard RAG system initialization...")
+        
+        # Load embedding model if not available
+        if not hasattr(self, 'embedding_model') or self.embedding_model is None:
+            print("📚 Loading sentence transformer model...")
+            self.embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
         
         # Load and process documents
         self.load_documents()
-        
-        print("✅ RAG system initialization complete! Documents cached for fast retrieval.")
-        
-        # System prompt for Athena
+    
+    def setup_system_prompt(self):
+        """Setup the system prompt for Athena"""
         self.system_prompt = """
         You are Athena, an AI Legal Assistant with expertise in Indian labor law and workplace rights. You have access to relevant legal documents and can provide accurate legal guidance based on the provided context.
         
@@ -122,8 +174,6 @@ class AthenaAgent:
         
         Please provide a comprehensive response based on the context above:
         """
-        
-        self.conversation_history = []
     
     def is_ready(self):
         """Check if the agent is ready to process queries (documents loaded)"""
@@ -284,6 +334,11 @@ class AthenaAgent:
             return "No legal documents available for reference."
         
         try:
+            # Ensure embedding model is loaded for query processing
+            if not hasattr(self, 'embedding_model') or self.embedding_model is None:
+                print("📚 Loading embedding model for query processing...")
+                self.embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+            
             # Generate query embedding
             query_embedding = self.embedding_model.encode([query])
             
@@ -440,6 +495,64 @@ class AthenaAgent:
             return "Available legal documents:\n" + "\n".join([f"• {doc}" for doc in docs])
         else:
             return "No legal documents available."
+
+    def is_ready(self):
+        """Check if the agent is ready to process queries (documents loaded)"""
+        return (self.document_chunks and 
+                self.faiss_index is not None and 
+                len(self.document_chunks) > 0)
+    
+    def get_status(self):
+        """Get comprehensive agent status including cache information"""
+        status = {
+            "status": "ready" if self.is_ready() else "not_ready",
+            "documents_loaded": len(self.document_chunks) if self.document_chunks else 0,
+            "embeddings_ready": self.faiss_index is not None,
+            "api_connection": "connected" if hasattr(self, 'api_key') and self.api_key else "disconnected"
+        }
+        
+        # Add cache information if available
+        if CACHE_AVAILABLE and hasattr(self, 'embeddings_cache') and self.embeddings_cache:
+            try:
+                cache_info = self.embeddings_cache.get_cache_info()
+                status["cache"] = cache_info
+            except Exception as e:
+                status["cache"] = {"status": "error", "message": str(e)}
+        else:
+            status["cache"] = {"status": "not_available"}
+        
+        return status
+    
+    def clear_cache(self):
+        """Clear the embeddings cache"""
+        if CACHE_AVAILABLE and hasattr(self, 'embeddings_cache') and self.embeddings_cache:
+            self.embeddings_cache.clear_cache()
+            print("🧹 Embeddings cache cleared")
+            return {"status": "success", "message": "Cache cleared successfully"}
+        else:
+            print("⚠️ Cache not available to clear")
+            return {"status": "error", "message": "Cache not available"}
+    
+    def regenerate_cache(self):
+        """Force regeneration of embeddings cache"""
+        if CACHE_AVAILABLE and hasattr(self, 'embeddings_cache') and self.embeddings_cache:
+            print("🔄 Regenerating embeddings cache...")
+            start_time = time.time()
+            
+            # Clear existing cache
+            self.embeddings_cache.clear_cache()
+            
+            # Regenerate
+            self.document_chunks, self.chunk_embeddings, self.faiss_index = (
+                self.embeddings_cache.get_or_create_embeddings()
+            )
+            
+            regen_time = time.time() - start_time
+            print(f"✅ Cache regenerated in {regen_time:.2f} seconds")
+            
+            return {"status": "success", "regeneration_time": regen_time}
+        else:
+            return {"status": "error", "message": "Cache not available"}
 
 def main():
     """

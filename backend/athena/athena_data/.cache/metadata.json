@@ -1,0 +1,7 @@
+{
+  "documents_hash": "88864fc81b5f2e0438fdb0ab9a5f22a5",
+  "num_chunks": 123,
+  "embedding_dim": 384,
+  "created_at": "2025-11-07T16:11:25",
+  "model_name": "all-MiniLM-L6-v2"
+}

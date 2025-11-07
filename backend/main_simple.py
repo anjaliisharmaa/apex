@@ -1041,6 +1041,73 @@ async def clear_agent_cache():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to clear cache: {str(e)}")
 
+@app.post("/api/agents/cache/regenerate")
+@app.post("/api/api/agents/cache/regenerate")  # Handle double prefix
+async def regenerate_agent_cache():
+    """
+    Regenerate embeddings cache for faster startup
+    """
+    orchestrator = get_orchestrator_agent()
+    
+    if not orchestrator:
+        raise HTTPException(status_code=503, detail="Orchestrator service unavailable")
+    
+    try:
+        # Get Athena agent and regenerate cache
+        athena = orchestrator._get_athena_agent()
+        if athena and hasattr(athena, 'regenerate_cache'):
+            result = athena.regenerate_cache()
+            return {
+                "message": "Agent cache regenerated successfully",
+                "result": result
+            }
+        else:
+            return {"message": "Cache regeneration not available"}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to regenerate cache: {str(e)}")
+
+@app.get("/api/agents/cache/info")
+@app.get("/api/api/agents/cache/info")  # Handle double prefix
+async def get_cache_info():
+    """
+    Get detailed cache information
+    """
+    orchestrator = get_orchestrator_agent()
+    
+    if not orchestrator:
+        raise HTTPException(status_code=503, detail="Orchestrator service unavailable")
+    
+    try:
+        # Get cache info from all agents
+        cache_info = {}
+        
+        # Athena cache info
+        athena = orchestrator._get_athena_agent()
+        if athena and hasattr(athena, 'get_status'):
+            athena_status = athena.get_status()
+            cache_info["athena"] = athena_status.get("cache", {})
+        
+        # Orchestrator cache info
+        orchestrator_stats = orchestrator.get_performance_stats()
+        cache_info["orchestrator"] = {
+            "response_cache_size": orchestrator_stats.get("cache_size", 0),
+            "cache_hits": orchestrator_stats.get("cache_hits", 0)
+        }
+        
+        return {
+            "status": "success",
+            "cache_info": cache_info,
+            "recommendations": [
+                "Regenerate cache when documents are updated",
+                "Clear response cache periodically to free memory",
+                "Monitor cache hit rates for optimization"
+            ]
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get cache info: {str(e)}")
+
 @app.get("/api/conversations/{conversation_id}")
 async def get_conversation(conversation_id: str):
     """
