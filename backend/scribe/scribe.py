@@ -66,6 +66,8 @@ class ScribeAgent:
                     for line in f:
                         if line.startswith('GOOGLE_API_KEY='):
                             key = line.split('=', 1)[1].strip().strip('"\'').strip()
+                            # Remove any whitespace including control characters
+                            key = ''.join(key.split())
                             print(f"✅ API key loaded: {key[:12]}...")
                             return key
             

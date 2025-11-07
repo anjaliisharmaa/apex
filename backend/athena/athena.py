@@ -9,6 +9,7 @@ import os
 import json
 import urllib.request
 import urllib.parse
+import time
 from datetime import datetime
 from typing import List, Dict, Any
 import PyPDF2
@@ -201,7 +202,7 @@ class AthenaAgent:
         # First try environment variable
         api_key = os.getenv('GOOGLE_API_KEY')
         if api_key:
-            return api_key
+            return ''.join(api_key.split())  # Remove any whitespace
         
         # Try to load from .env file
         env_file_path = os.path.join(os.path.dirname(__file__), '..', '.env')
@@ -209,7 +210,8 @@ class AthenaAgent:
             with open(env_file_path, 'r') as f:
                 for line in f:
                     if line.startswith('GOOGLE_API_KEY='):
-                        return line.split('=', 1)[1].strip().strip('"\'')
+                        key = line.split('=', 1)[1].strip().strip('"\'')
+                        return ''.join(key.split())  # Remove any whitespace including control chars
         
         return None
     
@@ -334,15 +336,15 @@ class AthenaAgent:
             return "No legal documents available for reference."
         
         try:
-            # Ensure embedding model is loaded for query processing
+            # Use the pre-loaded embedding model for fast query processing
             if not hasattr(self, 'embedding_model') or self.embedding_model is None:
-                print("📚 Loading embedding model for query processing...")
-                self.embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+                print("❌ Embedding model not initialized! This shouldn't happen with cache.")
+                return "Error: Embedding model not available."
             
-            # Generate query embedding
+            # Generate query embedding (this should be fast)
             query_embedding = self.embedding_model.encode([query])
             
-            # Search for similar chunks
+            # Search for similar chunks (this should be instant with FAISS)
             scores, indices = self.faiss_index.search(query_embedding.astype('float32'), top_k)
             
             # Collect relevant chunks
@@ -378,6 +380,8 @@ class AthenaAgent:
             str: Athena's response with legal guidance
         """
         try:
+            query_start = time.time()
+            
             # Ensure RAG system is ready (should be fast after first initialization)
             if not self.is_ready():
                 print("⚠️ Athena RAG system not ready, initializing...")
@@ -386,7 +390,10 @@ class AthenaAgent:
                 print("⚡ Athena using cached documents for fast response")
             
             # Retrieve relevant context from documents
+            context_start = time.time()
             context = self.retrieve_relevant_context(user_query, top_k=5)
+            context_time = time.time() - context_start
+            print(f"⚡ Context retrieval: {context_time:.2f}s")
             
             # Prepare the prompt with context
             prompt = self.system_prompt.format(
@@ -401,10 +408,10 @@ class AthenaAgent:
                     }]
                 }],
                 "generationConfig": {
-                    "temperature": 0.3,
-                    "topP": 0.8,
-                    "topK": 40,
-                    "maxOutputTokens": 2048
+                    "temperature": 0.1,  # Lower for faster, more deterministic responses
+                    "topP": 0.9,
+                    "topK": 20,  # Reduced for faster processing
+                    "maxOutputTokens": 1024  # Reduced for faster responses
                 }
             }
             
@@ -420,9 +427,12 @@ class AthenaAgent:
                 }
             )
             
-            # Make the request
+            # Make the request with optimized timeout for faster responses
+            api_start = time.time()
             try:
-                with urllib.request.urlopen(req, timeout=30) as response:
+                with urllib.request.urlopen(req, timeout=15) as response:
+                    api_time = time.time() - api_start
+                    print(f"⚡ API call: {api_time:.2f}s")
                     if response.status == 200:
                         response_data = json.loads(response.read().decode())
                         
@@ -448,6 +458,8 @@ class AthenaAgent:
                                     "timestamp": datetime.now().isoformat()
                                 })
                                 
+                                total_time = time.time() - query_start
+                                print(f"⚡ Total response time: {total_time:.2f}s")
                                 return f"⚖️ {athena_response}"
                             else:
                                 return "❌ Unexpected response format from API. The response structure has changed."

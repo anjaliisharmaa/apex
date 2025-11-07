@@ -20,7 +20,9 @@ def pre_generate_cache():
     print("=" * 50)
     
     try:
-        from athena.embeddings_cache import EmbeddingsCache
+        # Fix import path
+        sys.path.append('athena')
+        from embeddings_cache import EmbeddingsCache
         
         # Initialize cache system
         data_dir = os.path.join(current_dir, 'athena', 'athena_data')
@@ -95,7 +97,8 @@ def clean_cache():
     print("=" * 30)
     
     try:
-        from athena.embeddings_cache import EmbeddingsCache
+        sys.path.append('athena')
+        from embeddings_cache import EmbeddingsCache
         
         data_dir = os.path.join(current_dir, 'athena', 'athena_data')
         cache = EmbeddingsCache(data_dir)
@@ -112,7 +115,8 @@ def show_cache_info():
     print("=" * 20)
     
     try:
-        from athena.embeddings_cache import EmbeddingsCache
+        sys.path.append('athena')
+        from embeddings_cache import EmbeddingsCache
         
         data_dir = os.path.join(current_dir, 'athena', 'athena_data')
         cache = EmbeddingsCache(data_dir)
