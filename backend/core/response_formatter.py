@@ -7,83 +7,74 @@ import re
 
 def format_response_for_frontend(response: str) -> str:
     """
-    Convert markdown-style formatting to HTML for better frontend display
+    Convert markdown-style formatting to clean text for better frontend display
     
     Args:
         response (str): Raw response with markdown formatting
         
     Returns:
-        str: Formatted response with HTML
+        str: Formatted response with clean text formatting
     """
     if not response:
         return response
     
-    # Convert **bold text** to <strong>bold text</strong>
-    response = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', response)
+    # First, protect existing bullet points by marking them
+    response = response.replace('•', '###BULLET###')
     
-    # Convert *italic text* to <strong>italic text</strong> (treating as bold for better visibility)
-    response = re.sub(r'\*(.*?)\*', r'<strong>\1</strong>', response)
+    # Convert **bold text** to plain text (remove double asterisks)
+    response = re.sub(r'\*\*(.*?)\*\*', r'\1', response)
     
-    # Format numbered lists (1. 2. 3. etc.) to be on separate lines with better spacing
-    response = re.sub(r'(\d+\.\s+)', r'<br><br>\1', response)
+    # Convert *italic text* to plain text only if it's clearly italic markup (not bullet points)
+    # Only match asterisks that have text on both sides without spaces
+    response = re.sub(r'(\w)\*(\w[^*]*?)\*(\w)', r'\1\2\3', response)
     
-    # Format bullet points with dashes or asterisks
-    response = re.sub(r'^[\-\*]\s+', r'<br>• ', response, flags=re.MULTILINE)
+    # Convert standalone asterisks used as bullet points to proper bullets
+    response = re.sub(r'\s*\*\s+([^*\n]+?)(?=\s*[\n*]|$)', r'\n    • \1', response)
     
-    # Clean up multiple consecutive <br> tags
-    response = re.sub(r'(<br>\s*){3,}', r'<br><br>', response)
+    # Restore bullet points and ensure proper formatting
+    response = response.replace('###BULLET###', '•')
     
-    # Remove leading <br> if it exists
-    response = re.sub(r'^(<br>\s*)+', '', response)
+    # Format numbered lists (1. 2. 3. etc.) to be on separate lines
+    response = re.sub(r'(\d+\.\s+)', r'\n\n\1', response)
     
-    return response.strip()
+    # Ensure bullet points are on new lines when they follow text
+    response = re.sub(r'([.:\w])\s*•\s*', r'\1\n\n• ', response)
+    
+    # Clean up multiple spaces and line breaks
+    response = re.sub(r'\n{4,}', r'\n\n\n', response)
+    response = re.sub(r'[ \t]+', r' ', response)
+    
+    # Remove leading/trailing whitespace
+    response = response.strip()
+    
+    return response
 
 def format_legal_response(response: str) -> str:
     """
-    Format legal responses with proper structure and emphasis
+    Format legal responses with proper structure and clean text
     
     Args:
         response (str): Raw legal response
         
     Returns:
-        str: Formatted legal response
+        str: Formatted legal response with clean text
     """
     formatted = format_response_for_frontend(response)
     
-    # Add extra formatting for legal terms
-    legal_terms = [
-        'harassment', 'discrimination', 'legal rights', 'documentation', 
-        'HR department', 'legal counsel', 'complaint', 'violation',
-        'employment law', 'workplace policy', 'evidence', 'witness'
-    ]
-    
-    for term in legal_terms:
-        # Make legal terms bold (case insensitive)
-        pattern = re.compile(re.escape(term), re.IGNORECASE)
-        formatted = pattern.sub(f'<strong>{term}</strong>', formatted)
-    
+    # No HTML formatting - just clean text formatting
     return formatted
 
 def format_emotional_response(response: str) -> str:
     """
-    Format emotional support responses with empathy and clarity
+    Format emotional support responses with empathy and clear text formatting
     
     Args:
         response (str): Raw emotional support response
         
     Returns:
-        str: Formatted emotional support response
+        str: Formatted emotional support response with clean text
     """
     formatted = format_response_for_frontend(response)
     
-    # Add gentle emphasis to supportive phrases
-    supportive_phrases = [
-        'you are not alone', 'here to support', 'courage to reach out',
-        'immense courage', 'support you', 'here to listen'
-    ]
-    
-    for phrase in supportive_phrases:
-        pattern = re.compile(re.escape(phrase), re.IGNORECASE)
-        formatted = pattern.sub(f'<strong>{phrase}</strong>', formatted)
-    
+    # No HTML formatting - just clean text formatting
     return formatted
