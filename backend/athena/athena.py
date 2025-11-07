@@ -347,7 +347,7 @@ class AthenaAgent:
             # Search for similar chunks (this should be instant with FAISS)
             scores, indices = self.faiss_index.search(query_embedding.astype('float32'), top_k)
             
-            # Collect relevant chunks
+            # Collect relevant chunks (optimized for smaller payloads)
             context_parts = []
             seen_sources = set()
             
@@ -358,12 +358,15 @@ class AthenaAgent:
                     
                     # Add source header if new
                     if source not in seen_sources:
-                        context_parts.append(f"\n--- From {source} ---")
+                        context_parts.append(f"[{source}]")  # Shorter source format
                         seen_sources.add(source)
                     
+                    # Truncate very long chunks for faster processing
+                    if len(chunk_text) > 800:
+                        chunk_text = chunk_text[:800] + "..."
                     context_parts.append(chunk_text.strip())
             
-            return "\n\n".join(context_parts)
+            return "\n".join(context_parts)  # Single newline instead of double
             
         except Exception as e:
             print(f"❌ Error retrieving context: {e}")
@@ -389,9 +392,9 @@ class AthenaAgent:
             else:
                 print("⚡ Athena using cached documents for fast response")
             
-            # Retrieve relevant context from documents
+            # Retrieve relevant context from documents (optimized for speed)
             context_start = time.time()
-            context = self.retrieve_relevant_context(user_query, top_k=5)
+            context = self.retrieve_relevant_context(user_query, top_k=3)  # Reduced from 5 to 3 for faster processing
             context_time = time.time() - context_start
             print(f"⚡ Context retrieval: {context_time:.2f}s")
             
@@ -408,10 +411,10 @@ class AthenaAgent:
                     }]
                 }],
                 "generationConfig": {
-                    "temperature": 0.1,  # Lower for faster, more deterministic responses
+                    "temperature": 0.1,  # Lower for faster, more deterministic responses  
                     "topP": 0.9,
-                    "topK": 20,  # Reduced for faster processing
-                    "maxOutputTokens": 1024  # Reduced for faster responses
+                    "topK": 10,  # Further reduced for faster processing
+                    "maxOutputTokens": 800  # Reduced for faster responses while maintaining quality
                 }
             }
             
@@ -430,7 +433,7 @@ class AthenaAgent:
             # Make the request with optimized timeout for faster responses
             api_start = time.time()
             try:
-                with urllib.request.urlopen(req, timeout=15) as response:
+                with urllib.request.urlopen(req, timeout=10) as response:  # Reduced from 15s to 10s
                     api_time = time.time() - api_start
                     print(f"⚡ API call: {api_time:.2f}s")
                     if response.status == 200:

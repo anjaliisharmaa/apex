@@ -35,7 +35,7 @@ class ScribeAgent:
         self.api_available = False
         
         if self.api_key:
-            self.api_url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={self.api_key}"
+            self.api_url = f"https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key={self.api_key}"
             self.api_available = self.test_api_connection()
         
         if not self.api_available:
