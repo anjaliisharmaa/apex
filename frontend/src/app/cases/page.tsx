@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { 
   FunnelIcon,
@@ -17,61 +17,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 interface Case {
   id: string
-  referenceNumber: string
   title: string
-  type: string
+  description: string
   status: 'draft' | 'submitted' | 'under-review' | 'additional-info-required' | 'approved' | 'rejected' | 'completed'
-  createdDate: Date
-  lastUpdate: Date
+  created_at: string
+  last_updated: string
 }
-
-const mockCases: Case[] = [
-  {
-    id: '1',
-    referenceNumber: 'ML-2024-001',
-    title: 'Maternity Leave Application',
-    type: 'Leave Application',
-    status: 'approved',
-    createdDate: new Date('2024-01-15'),
-    lastUpdate: new Date('2024-01-20')
-  },
-  {
-    id: '2',
-    referenceNumber: 'TR-2024-001',
-    title: 'Spouse Ground Transfer Request',
-    type: 'Transfer Request',
-    status: 'under-review',
-    createdDate: new Date('2024-02-01'),
-    lastUpdate: new Date('2024-02-10')
-  },
-  {
-    id: '3',
-    referenceNumber: 'GR-2024-001',
-    title: 'Workplace Harassment Complaint',
-    type: 'Grievance',
-    status: 'additional-info-required',
-    createdDate: new Date('2024-02-15'),
-    lastUpdate: new Date('2024-02-25')
-  },
-  {
-    id: '4',
-    referenceNumber: 'CCL-2024-001',
-    title: 'Child Care Leave Application',
-    type: 'Leave Application',
-    status: 'submitted',
-    createdDate: new Date('2024-03-01'),
-    lastUpdate: new Date('2024-03-01')
-  },
-  {
-    id: '5',
-    referenceNumber: 'DRAFT-001',
-    title: 'Medical Ground Transfer',
-    type: 'Transfer Request',
-    status: 'draft',
-    createdDate: new Date('2024-03-05'),
-    lastUpdate: new Date('2024-03-05')
-  }
-]
 
 const statusColors = {
   'draft': 'bg-gray-100 text-gray-800',
@@ -96,25 +47,41 @@ const statusLabels = {
 export default function CasesPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
-  const [filteredCases, setFilteredCases] = useState(mockCases)
+  const [cases, setCases] = useState<Case[]>([])
+  const [filteredCases, setFilteredCases] = useState<Case[]>([])
+  const [loading, setLoading] = useState(true)
 
-  const handleSearch = (term: string) => {
-    setSearchTerm(term)
-    filterCases(term, statusFilter)
-  }
+  useEffect(() => {
+    const fetchCases = async () => {
+      try {
+        setLoading(true)
+        const response = await fetch('http://localhost:8000/api/cases')
+        if (response.ok) {
+          const data = await response.json()
+          setCases(data)
+          setFilteredCases(data)
+        }
+      } catch (error) {
+        console.error('Failed to fetch cases:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
 
-  const handleStatusFilter = (status: string) => {
-    setStatusFilter(status)
-    filterCases(searchTerm, status)
-  }
+    fetchCases()
+  }, [])
+
+  useEffect(() => {
+    filterCases(searchTerm, statusFilter)
+  }, [cases, searchTerm, statusFilter])
 
   const filterCases = (term: string, status: string) => {
-    let filtered = mockCases
+    let filtered = cases
 
     if (term) {
       filtered = filtered.filter(case_ => 
         case_.title.toLowerCase().includes(term.toLowerCase()) ||
-        case_.referenceNumber.toLowerCase().includes(term.toLowerCase())
+        case_.id.toLowerCase().includes(term.toLowerCase())
       )
     }
 
@@ -127,12 +94,16 @@ export default function CasesPage() {
 
   const getStatusCounts = () => {
     const counts = {
-      all: mockCases.length,
-      active: mockCases.filter(c => ['submitted', 'under-review', 'additional-info-required'].includes(c.status)).length,
-      completed: mockCases.filter(c => ['approved', 'rejected', 'completed'].includes(c.status)).length,
-      draft: mockCases.filter(c => c.status === 'draft').length
+      all: cases.length,
+      active: cases.filter(c => ['submitted', 'under-review', 'additional-info-required'].includes(c.status)).length,
+      completed: cases.filter(c => ['approved', 'rejected', 'completed'].includes(c.status)).length,
+      draft: cases.filter(c => c.status === 'draft').length
     }
     return counts
+  }
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString()
   }
 
   const statusCounts = getStatusCounts()
@@ -196,7 +167,7 @@ export default function CasesPage() {
               <Input
                 placeholder="Search by case title or reference number..."
                 value={searchTerm}
-                onChange={(e) => handleSearch(e.target.value)}
+                onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
               />
             </div>
@@ -206,7 +177,7 @@ export default function CasesPage() {
               <FunnelIcon className="h-4 w-4 text-gray-400" />
               <select
                 value={statusFilter}
-                onChange={(e) => handleStatusFilter(e.target.value)}
+                onChange={(e) => setStatusFilter(e.target.value)}
                 className="border border-gray-300 rounded-md px-3 py-2 bg-white text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
               >
                 <option value="all">All Status</option>
@@ -226,83 +197,93 @@ export default function CasesPage() {
       {/* Cases Table */}
       <Card>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Reference #
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Title
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Type
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Created
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Last Update
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredCases.map((case_) => (
-                  <tr key={case_.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {case_.referenceNumber}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">{case_.title}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {case_.type}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${statusColors[case_.status]}`}>
-                        {statusLabels[case_.status]}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {case_.createdDate.toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {case_.lastUpdate.toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex space-x-2">
-                        <Link href={`/cases/${case_.id}`}>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <EyeIcon className="h-4 w-4" />
-                          </Button>
-                        </Link>
-                        {case_.status === 'draft' && (
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <PencilIcon className="h-4 w-4" />
-                          </Button>
-                        )}
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <ArrowDownTrayIcon className="h-4 w-4" />
-                        </Button>
-                        {case_.status === 'draft' && (
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 hover:text-red-700">
-                            <TrashIcon className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
-                    </td>
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+              <span className="ml-2 text-gray-600">Loading cases...</span>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Reference #
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Title
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Type
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Created
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Last Update
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {filteredCases.map((case_) => (
+                    <tr key={case_.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {case_.id.toUpperCase()}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">{case_.title}</div>
+                        <div className="text-sm text-gray-500">{case_.description}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {case_.title.includes('Leave') ? 'Leave Application' : 
+                         case_.title.includes('Transfer') ? 'Transfer Request' :
+                         case_.title.includes('Harassment') || case_.title.includes('Complaint') ? 'Grievance' : 'Other'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${statusColors[case_.status]}`}>
+                          {statusLabels[case_.status]}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {formatDate(case_.created_at)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {formatDate(case_.last_updated)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div className="flex space-x-2">
+                          <Link href={`/cases/${case_.id}`}>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <EyeIcon className="h-4 w-4" />
+                            </Button>
+                          </Link>
+                          {case_.status === 'draft' && (
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <PencilIcon className="h-4 w-4" />
+                            </Button>
+                          )}
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <ArrowDownTrayIcon className="h-4 w-4" />
+                          </Button>
+                          {case_.status === 'draft' && (
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 hover:text-red-700">
+                              <TrashIcon className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
 
           {filteredCases.length === 0 && (
             <div className="text-center py-12">

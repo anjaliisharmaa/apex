@@ -519,19 +519,370 @@ async def get_cases():
             id="case_001",
             title="Maternity Leave Application",
             description="Application for 6-month maternity leave",
-            status="pending",
+            status="approved",
             created_at="2024-01-15",
             last_updated="2024-01-20"
         ),
         CaseInfo(
             id="case_002", 
-            title="Workplace Harassment Complaint",
-            description="Formal complaint regarding workplace harassment",
-            status="in_progress",
-            created_at="2024-01-10",
-            last_updated="2024-01-25"
+            title="Spouse Ground Transfer Request",
+            description="Request for transfer to Delhi office due to spouse's job relocation",
+            status="under-review",
+            created_at="2024-01-02",
+            last_updated="2024-02-10"
+        ),
+        CaseInfo(
+            id="case_003",
+            title="Workplace Harassment Complaint", 
+            description="Formal complaint regarding inappropriate behavior and harassment",
+            status="additional-info-required",
+            created_at="2024-02-15",
+            last_updated="2024-02-25"
+        ),
+        CaseInfo(
+            id="case_004",
+            title="Child Care Leave Application",
+            description="Application for child care leave to take care of newborn child",
+            status="submitted",
+            created_at="2024-03-01",
+            last_updated="2024-03-01"
+        ),
+        CaseInfo(
+            id="case_005",
+            title="Medical Ground Transfer",
+            description="Draft application for medical ground transfer due to health condition",
+            status="draft",
+            created_at="2024-03-05",
+            last_updated="2024-03-05"
         )
     ]
+
+@app.get("/api/cases/{case_id}")
+async def get_case_by_id(case_id: str):
+    """
+    Get detailed information for a specific case by ID
+    """
+    # Mock case data - each case has unique details
+    case_data = {
+        "case_001": {
+            "id": "case_001",
+            "referenceNumber": "ML-2024-001",
+            "title": "Maternity Leave Application",
+            "type": "Leave Application",
+            "status": "approved",
+            "createdDate": "2024-01-15",
+            "lastUpdate": "2024-01-20",
+            "description": "Application for maternity leave for 26 weeks starting from February 1, 2024, as per the Maternity Benefits Act.",
+            "submittedBy": "Dr. Priya Sharma",
+            "assignedTo": "HR Department - Mrs. Anjali Gupta",
+            "department": "Human Resources",
+            "priority": "high",
+            "comments": "Medical certificate attached. Expected delivery date: February 15, 2024.",
+            "timeline": [
+                {
+                    "id": "1",
+                    "title": "Application Submitted",
+                    "description": "Maternity leave application submitted with all required documents",
+                    "timestamp": "2024-01-15T09:00:00",
+                    "type": "submitted",
+                    "user": "Dr. Priya Sharma"
+                },
+                {
+                    "id": "2",
+                    "title": "Under Review",
+                    "description": "Application forwarded to HR department for review",
+                    "timestamp": "2024-01-16T10:30:00",
+                    "type": "update",
+                    "user": "System"
+                },
+                {
+                    "id": "3",
+                    "title": "Medical Certificate Verified",
+                    "description": "Medical certificate verified by medical officer",
+                    "timestamp": "2024-01-18T14:15:00",
+                    "type": "update",
+                    "user": "Dr. Rajesh Kumar (Medical Officer)"
+                },
+                {
+                    "id": "4",
+                    "title": "Application Approved",
+                    "description": "Maternity leave approved for 26 weeks starting February 1, 2024",
+                    "timestamp": "2024-01-20T11:45:00",
+                    "type": "approved",
+                    "user": "Mrs. Anjali Gupta (HR)"
+                }
+            ],
+            "documents": [
+                {
+                    "id": "1",
+                    "name": "Maternity_Leave_Application.pdf",
+                    "type": "PDF",
+                    "size": "245 KB",
+                    "uploadDate": "2024-01-15"
+                },
+                {
+                    "id": "2",
+                    "name": "Medical_Certificate.pdf",
+                    "type": "PDF",
+                    "size": "180 KB",
+                    "uploadDate": "2024-01-15"
+                },
+                {
+                    "id": "3",
+                    "name": "Approval_Letter.pdf",
+                    "type": "PDF",
+                    "size": "156 KB",
+                    "uploadDate": "2024-01-20"
+                }
+            ]
+        },
+        "case_002": {
+            "id": "case_002",
+            "referenceNumber": "TR-2024-001",
+            "title": "Spouse Ground Transfer Request",
+            "type": "Transfer Request",
+            "status": "under-review",
+            "createdDate": "2024-01-02",
+            "lastUpdate": "2024-02-10",
+            "description": "Request for transfer to Delhi office due to spouse's job relocation. Current position: Senior Software Engineer, Mumbai office.",
+            "submittedBy": "Mr. Rahul Verma",
+            "assignedTo": "HR Transfer Committee - Mr. Suresh Kumar",
+            "department": "Human Resources",
+            "priority": "medium",
+            "comments": "Spouse employment letter and marriage certificate provided. Transfer subject to position availability in Delhi office.",
+            "timeline": [
+                {
+                    "id": "1",
+                    "title": "Transfer Request Submitted",
+                    "description": "Employee submitted transfer request with supporting documents",
+                    "timestamp": "2024-01-02T14:30:00",
+                    "type": "submitted",
+                    "user": "Mr. Rahul Verma"
+                },
+                {
+                    "id": "2",
+                    "title": "Initial Review",
+                    "description": "HR department initiated preliminary review of transfer request",
+                    "timestamp": "2024-01-05T10:15:00",
+                    "type": "update",
+                    "user": "HR Department"
+                },
+                {
+                    "id": "3",
+                    "title": "Documentation Verified",
+                    "description": "All supporting documents verified and found to be in order",
+                    "timestamp": "2024-01-12T16:20:00",
+                    "type": "update",
+                    "user": "Ms. Priti Singh (HR Executive)"
+                },
+                {
+                    "id": "4",
+                    "title": "Position Availability Check",
+                    "description": "Checking for suitable positions in Delhi office",
+                    "timestamp": "2024-02-01T09:45:00",
+                    "type": "update",
+                    "user": "Mr. Suresh Kumar (Transfer Committee)"
+                },
+                {
+                    "id": "5",
+                    "title": "Interview Scheduled",
+                    "description": "Interview scheduled with Delhi office team lead for February 15, 2024",
+                    "timestamp": "2024-02-10T11:30:00",
+                    "type": "update",
+                    "user": "Delhi Office HR"
+                }
+            ],
+            "documents": [
+                {
+                    "id": "1",
+                    "name": "Transfer_Request_Form.pdf",
+                    "type": "PDF",
+                    "size": "198 KB",
+                    "uploadDate": "2024-01-02"
+                },
+                {
+                    "id": "2",
+                    "name": "Spouse_Employment_Letter.pdf",
+                    "type": "PDF",
+                    "size": "156 KB",
+                    "uploadDate": "2024-01-02"
+                },
+                {
+                    "id": "3",
+                    "name": "Marriage_Certificate.pdf",
+                    "type": "PDF",
+                    "size": "234 KB",
+                    "uploadDate": "2024-01-02"
+                },
+                {
+                    "id": "4",
+                    "name": "Performance_Review_2023.pdf",
+                    "type": "PDF",
+                    "size": "289 KB",
+                    "uploadDate": "2024-01-05"
+                }
+            ]
+        },
+        "case_003": {
+            "id": "case_003",
+            "referenceNumber": "GR-2024-001",
+            "title": "Workplace Harassment Complaint",
+            "type": "Grievance",
+            "status": "additional-info-required",
+            "createdDate": "2024-02-15",
+            "lastUpdate": "2024-02-25",
+            "description": "Formal complaint regarding inappropriate behavior and harassment by a senior colleague. Seeking immediate investigation and resolution.",
+            "submittedBy": "Ms. Kavya Patel",
+            "assignedTo": "Internal Complaints Committee - Ms. Neha Shah",
+            "department": "Legal & Compliance",
+            "priority": "high",
+            "comments": "Confidential complaint filed. Additional witness statements required to proceed with investigation.",
+            "timeline": [
+                {
+                    "id": "1",
+                    "title": "Complaint Filed",
+                    "description": "Formal harassment complaint submitted to Internal Complaints Committee",
+                    "timestamp": "2024-02-15T11:15:00",
+                    "type": "submitted",
+                    "user": "Ms. Kavya Patel"
+                },
+                {
+                    "id": "2",
+                    "title": "Complaint Acknowledged",
+                    "description": "ICC acknowledged receipt and assigned case reference number",
+                    "timestamp": "2024-02-16T09:30:00",
+                    "type": "update",
+                    "user": "Ms. Neha Shah (ICC Chairperson)"
+                },
+                {
+                    "id": "3",
+                    "title": "Initial Assessment",
+                    "description": "Initial assessment completed, case marked for detailed investigation",
+                    "timestamp": "2024-02-20T14:45:00",
+                    "type": "update",
+                    "user": "Internal Complaints Committee"
+                },
+                {
+                    "id": "4",
+                    "title": "Additional Information Requested",
+                    "description": "Committee requested additional witness statements and evidence",
+                    "timestamp": "2024-02-25T10:20:00",
+                    "type": "info-required",
+                    "user": "Ms. Neha Shah (ICC)"
+                }
+            ],
+            "documents": [
+                {
+                    "id": "1",
+                    "name": "Harassment_Complaint_Form.pdf",
+                    "type": "PDF",
+                    "size": "267 KB",
+                    "uploadDate": "2024-02-15"
+                },
+                {
+                    "id": "2",
+                    "name": "Incident_Documentation.pdf",
+                    "type": "PDF",
+                    "size": "423 KB",
+                    "uploadDate": "2024-02-15"
+                },
+                {
+                    "id": "3",
+                    "name": "Email_Evidence.pdf",
+                    "type": "PDF",
+                    "size": "187 KB",
+                    "uploadDate": "2024-02-18"
+                }
+            ]
+        },
+        "case_004": {
+            "id": "case_004",
+            "referenceNumber": "CCL-2024-001",
+            "title": "Child Care Leave Application",
+            "type": "Leave Application",
+            "status": "submitted",
+            "createdDate": "2024-03-01",
+            "lastUpdate": "2024-03-01",
+            "description": "Application for child care leave to take care of newborn child as per company policy. Requesting 6 months leave starting from March 15, 2024.",
+            "submittedBy": "Mr. Amit Sharma",
+            "assignedTo": "HR Department - Mrs. Anjali Gupta",
+            "department": "Human Resources",
+            "priority": "medium",
+            "comments": "Child birth certificate and medical documents submitted. Leave application under review.",
+            "timeline": [
+                {
+                    "id": "1",
+                    "title": "Application Submitted",
+                    "description": "Child care leave application submitted with required documents",
+                    "timestamp": "2024-03-01T10:45:00",
+                    "type": "submitted",
+                    "user": "Mr. Amit Sharma"
+                }
+            ],
+            "documents": [
+                {
+                    "id": "1",
+                    "name": "Childcare_Leave_Application.pdf",
+                    "type": "PDF",
+                    "size": "213 KB",
+                    "uploadDate": "2024-03-01"
+                },
+                {
+                    "id": "2",
+                    "name": "Birth_Certificate.pdf",
+                    "type": "PDF",
+                    "size": "165 KB",
+                    "uploadDate": "2024-03-01"
+                },
+                {
+                    "id": "3",
+                    "name": "Medical_Records.pdf",
+                    "type": "PDF",
+                    "size": "298 KB",
+                    "uploadDate": "2024-03-01"
+                }
+            ]
+        },
+        "case_005": {
+            "id": "case_005",
+            "referenceNumber": "DRAFT-001",
+            "title": "Medical Ground Transfer",
+            "type": "Transfer Request",
+            "status": "draft",
+            "createdDate": "2024-03-05",
+            "lastUpdate": "2024-03-05",
+            "description": "Draft application for medical ground transfer due to health condition requiring specific climate and medical facilities available in Bangalore office.",
+            "submittedBy": "Dr. Sarah Khan",
+            "assignedTo": "Not Assigned",
+            "department": "Pending Submission",
+            "priority": "low",
+            "comments": "Draft application saved. Medical reports and specialist recommendations pending attachment.",
+            "timeline": [
+                {
+                    "id": "1",
+                    "title": "Draft Created",
+                    "description": "Transfer request draft created and saved",
+                    "timestamp": "2024-03-05T16:30:00",
+                    "type": "submitted",
+                    "user": "Dr. Sarah Khan"
+                }
+            ],
+            "documents": [
+                {
+                    "id": "1",
+                    "name": "Draft_Transfer_Application.pdf",
+                    "type": "PDF",
+                    "size": "142 KB",
+                    "uploadDate": "2024-03-05"
+                }
+            ]
+        }
+    }
+    
+    if case_id not in case_data:
+        raise HTTPException(status_code=404, detail="Case not found")
+    
+    return case_data[case_id]
 
 @app.get("/api/resources")
 async def get_resources():
@@ -650,7 +1001,7 @@ if __name__ == "__main__":
     uvicorn.run(
         app, 
         host="127.0.0.1", 
-        port=8000, 
+        port=8001, 
         reload=False,
         log_level="info"
     )

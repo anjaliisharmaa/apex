@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { 
@@ -23,7 +23,7 @@ interface TimelineEvent {
   id: string
   title: string
   description: string
-  timestamp: Date
+  timestamp: string
   type: 'submitted' | 'update' | 'approved' | 'rejected' | 'info-required' | 'completed'
   user: string
 }
@@ -33,7 +33,7 @@ interface CaseDocument {
   name: string
   type: string
   size: string
-  uploadDate: Date
+  uploadDate: string
 }
 
 interface CaseDetails {
@@ -42,8 +42,8 @@ interface CaseDetails {
   title: string
   type: string
   status: 'draft' | 'submitted' | 'under-review' | 'additional-info-required' | 'approved' | 'rejected' | 'completed'
-  createdDate: Date
-  lastUpdate: Date
+  createdDate: string
+  lastUpdate: string
   description: string
   submittedBy: string
   assignedTo: string
@@ -52,80 +52,6 @@ interface CaseDetails {
   timeline: TimelineEvent[]
   documents: CaseDocument[]
   comments: string
-}
-
-// Mock data - in a real app, this would be fetched based on the ID
-const mockCaseDetails: CaseDetails = {
-  id: '1',
-  referenceNumber: 'ML-2024-001',
-  title: 'Maternity Leave Application',
-  type: 'Leave Application',
-  status: 'approved',
-  createdDate: new Date('2024-01-15'),
-  lastUpdate: new Date('2024-01-20'),
-  description: 'Application for maternity leave for 26 weeks starting from February 1, 2024, as per the Maternity Benefits Act.',
-  submittedBy: 'Dr. Priya Sharma',
-  assignedTo: 'HR Department - Mrs. Anjali Gupta',
-  department: 'Human Resources',
-  priority: 'high',
-  comments: 'Medical certificate attached. Expected delivery date: February 15, 2024.',
-  timeline: [
-    {
-      id: '1',
-      title: 'Application Submitted',
-      description: 'Maternity leave application submitted with all required documents',
-      timestamp: new Date('2024-01-15T09:00:00'),
-      type: 'submitted',
-      user: 'Dr. Priya Sharma'
-    },
-    {
-      id: '2',
-      title: 'Under Review',
-      description: 'Application forwarded to HR department for review',
-      timestamp: new Date('2024-01-16T10:30:00'),
-      type: 'update',
-      user: 'System'
-    },
-    {
-      id: '3',
-      title: 'Medical Certificate Verified',
-      description: 'Medical certificate verified by medical officer',
-      timestamp: new Date('2024-01-18T14:15:00'),
-      type: 'update',
-      user: 'Dr. Rajesh Kumar (Medical Officer)'
-    },
-    {
-      id: '4',
-      title: 'Application Approved',
-      description: 'Maternity leave approved for 26 weeks starting February 1, 2024',
-      timestamp: new Date('2024-01-20T11:45:00'),
-      type: 'approved',
-      user: 'Mrs. Anjali Gupta (HR)'
-    }
-  ],
-  documents: [
-    {
-      id: '1',
-      name: 'Maternity_Leave_Application.pdf',
-      type: 'PDF',
-      size: '245 KB',
-      uploadDate: new Date('2024-01-15')
-    },
-    {
-      id: '2',
-      name: 'Medical_Certificate.pdf',
-      type: 'PDF',
-      size: '180 KB',
-      uploadDate: new Date('2024-01-15')
-    },
-    {
-      id: '3',
-      name: 'Approval_Letter.pdf',
-      type: 'PDF',
-      size: '156 KB',
-      uploadDate: new Date('2024-01-20')
-    }
-  ]
 }
 
 const statusColors = {
@@ -158,12 +84,82 @@ const timelineColors = {
 
 export default function CaseDetailPage() {
   const params = useParams()
-  const [caseDetails] = useState(mockCaseDetails)
+  const [caseDetails, setCaseDetails] = useState<CaseDetails | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const fetchCaseDetails = async () => {
+      try {
+        setLoading(true)
+        const response = await fetch(`http://localhost:8000/api/cases/${params.id}`)
+        
+        if (!response.ok) {
+          throw new Error('Case not found')
+        }
+        
+        const data = await response.json()
+        setCaseDetails(data)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load case details')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (params.id) {
+      fetchCaseDetails()
+    }
+  }, [params.id])
+
+  if (loading) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="animate-pulse">
+          <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
+          <div className="h-12 bg-gray-200 rounded w-1/2 mb-8"></div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-2 space-y-6">
+              <div className="h-64 bg-gray-200 rounded"></div>
+              <div className="h-96 bg-gray-200 rounded"></div>
+            </div>
+            <div className="space-y-6">
+              <div className="h-48 bg-gray-200 rounded"></div>
+              <div className="h-32 bg-gray-200 rounded"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (error || !caseDetails) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">Case Not Found</h1>
+          <p className="text-gray-600 mb-4">{error || 'The requested case could not be found.'}</p>
+          <Link href="/cases" className="text-primary-600 hover:text-primary-700">
+            ← Back to Cases
+          </Link>
+        </div>
+      </div>
+    )
+  }
 
   const getProgressPercentage = () => {
     const totalSteps = 4 // submitted, review, approval, completed
     const currentStep = caseDetails.timeline.length
     return Math.min((currentStep / totalSteps) * 100, 100)
+  }
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString()
+  }
+
+  const formatDateTime = (dateString: string) => {
+    const date = new Date(dateString)
+    return `${date.toLocaleDateString()} at ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
   }
 
   return (
@@ -217,11 +213,11 @@ export default function CaseDetailPage() {
                 </div>
                 <div>
                   <h4 className="font-medium text-gray-900">Created Date</h4>
-                  <p className="text-gray-600">{caseDetails.createdDate.toLocaleDateString()}</p>
+                  <p className="text-gray-600">{formatDate(caseDetails.createdDate)}</p>
                 </div>
                 <div>
                   <h4 className="font-medium text-gray-900">Last Update</h4>
-                  <p className="text-gray-600">{caseDetails.lastUpdate.toLocaleDateString()}</p>
+                  <p className="text-gray-600">{formatDate(caseDetails.lastUpdate)}</p>
                 </div>
               </div>
               
@@ -268,8 +264,8 @@ export default function CaseDetailPage() {
                                 <p className="text-xs text-gray-400 mt-1">by {event.user}</p>
                               </div>
                               <div className="whitespace-nowrap text-right text-sm text-gray-500">
-                                <time dateTime={event.timestamp.toISOString()}>
-                                  {event.timestamp.toLocaleDateString()} at {event.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                <time dateTime={event.timestamp}>
+                                  {formatDateTime(event.timestamp)}
                                 </time>
                               </div>
                             </div>
@@ -296,7 +292,7 @@ export default function CaseDetailPage() {
                       <DocumentIcon className="h-8 w-8 text-gray-400" />
                       <div>
                         <p className="text-sm font-medium text-gray-900">{doc.name}</p>
-                        <p className="text-xs text-gray-500">{doc.type} • {doc.size} • {doc.uploadDate.toLocaleDateString()}</p>
+                        <p className="text-xs text-gray-500">{doc.type} • {doc.size} • {formatDate(doc.uploadDate)}</p>
                       </div>
                     </div>
                     <Button variant="ghost" size="icon">
