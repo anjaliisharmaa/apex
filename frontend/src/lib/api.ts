@@ -71,6 +71,21 @@ export interface UserLogin {
   password: string;
 }
 
+export interface OTPRequest {
+  email: string;
+  password: string;
+}
+
+export interface OTPVerification {
+  email: string;
+  otp_code: string;
+}
+
+export interface OTPResponse {
+  message: string;
+  otp_sent: boolean;
+}
+
 export interface Token {
   access_token: string;
   token_type: string;
@@ -224,6 +239,30 @@ class APEXAPIClient {
       method: 'POST',
       body: JSON.stringify(userData),
     });
+  }
+
+  /**
+   * Request OTP for login
+   */
+  async requestOTP(otpRequest: OTPRequest): Promise<OTPResponse> {
+    return this.request<OTPResponse>('/api/request-otp', {
+      method: 'POST',
+      body: JSON.stringify(otpRequest),
+    });
+  }
+
+  /**
+   * Verify OTP and login
+   */
+  async verifyOTP(otpVerification: OTPVerification): Promise<Token> {
+    const token = await this.request<Token>('/api/verify-otp', {
+      method: 'POST',
+      body: JSON.stringify(otpVerification),
+    });
+    
+    // Store token in localStorage
+    this.setStoredToken(token.access_token);
+    return token;
   }
 
   /**

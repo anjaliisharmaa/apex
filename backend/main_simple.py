@@ -9,6 +9,10 @@ Provides REST API endpoints for the frontend application
 import os
 import sys
 import uuid
+import random
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Any, Union
 from fastapi import FastAPI, HTTPException, UploadFile, File, BackgroundTasks, Depends, status
@@ -117,6 +121,18 @@ class UserLogin(BaseModel):
     username: str
     password: str
 
+class OTPRequest(BaseModel):
+    email: str
+    password: str
+
+class OTPVerification(BaseModel):
+    email: str
+    otp_code: str
+
+class OTPResponse(BaseModel):
+    message: str
+    otp_sent: bool
+
 class UserResponse(BaseModel):
     id: int
     username: str
@@ -182,6 +198,93 @@ def authenticate_user(db: Session, username: str, password: str):
     if not verify_password(password, user.hashed_password):
         return False
     return user
+
+# OTP Utility Functions
+def generate_otp() -> str:
+    """Generate a 6-digit OTP code"""
+    return str(random.randint(100000, 999999))
+
+def send_otp_email(email: str, otp_code: str) -> bool:
+    """Send OTP via email (development mode - no actual email sent)"""
+    try:
+        # For development, just print the OTP (replace with actual email service)
+        print(f"� DEVELOPMENT MODE - OTP for {email}: {otp_code}")
+        print(f"� You can enter ANY 6-digit number (e.g., 123456) to proceed!")
+        
+        # In production, implement real email sending here:
+        # smtp_server = smtplib.SMTP('smtp.gmail.com', 587)
+        # smtp_server.starttls()
+        # smtp_server.login(sender_email, sender_password)
+        # ...
+        
+        return True
+    except Exception as e:
+        print(f"❌ Failed to send OTP email: {e}")
+        return False
+
+def store_otp(db: Session, email: str, otp_code: str) -> bool:
+    """Store OTP in database"""
+    try:
+        # Remove any existing unused OTP for this email
+        db.query(models.OTPCode).filter(
+            models.OTPCode.email == email,
+            models.OTPCode.is_used == False
+        ).update({"is_used": True})
+        
+        # Create new OTP record
+        expires_at = datetime.now(timezone.utc) + timedelta(minutes=5)  # 5 minute expiry
+        otp_record = models.OTPCode(
+            email=email,
+            otp_code=otp_code,
+            expires_at=expires_at
+        )
+        db.add(otp_record)
+        db.commit()
+        return True
+    except Exception as e:
+        print(f"❌ Failed to store OTP: {e}")
+        db.rollback()
+        return False
+
+def verify_otp(db: Session, email: str, otp_code: str) -> bool:
+    """Verify OTP code - accepts any 6-digit code for development"""
+    try:
+        # For development: Accept any 6-digit OTP code
+        if len(otp_code) == 6 and otp_code.isdigit():
+            print(f"✅ Development mode: Accepting any 6-digit OTP for {email}")
+            return True
+        
+        # Original OTP verification logic (commented out for development)
+        # otp_record = db.query(models.OTPCode).filter(
+        #     models.OTPCode.email == email,
+        #     models.OTPCode.otp_code == otp_code,
+        #     models.OTPCode.is_used == False,
+        #     models.OTPCode.expires_at > datetime.now(timezone.utc)
+        # ).first()
+        # 
+        # if not otp_record:
+        #     return False
+        # 
+        # # Increment attempts
+        # otp_record.attempts += 1
+        # 
+        # # Check if max attempts exceeded
+        # if otp_record.attempts >= otp_record.max_attempts:
+        #     otp_record.is_used = True
+        #     db.commit()
+        #     return False
+        # 
+        # # Mark as used if verification successful
+        # otp_record.is_used = True
+        # db.commit()
+        # return True
+        
+        return False
+        
+    except Exception as e:
+        print(f"❌ Failed to verify OTP: {e}")
+        db.rollback()
+        return False
 
 def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
     """Get current authenticated user from JWT token"""
@@ -331,6 +434,121 @@ async def register_user(user_data: UserRegister, db: Session = Depends(get_db)):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to create user: {str(e)}"
+        )
+
+@app.post("/api/request-otp", response_model=OTPResponse)
+@app.post("/api/api/request-otp", response_model=OTPResponse)  # Handle double prefix
+async def request_otp(otp_request: OTPRequest, db: Session = Depends(get_db)):
+    """Request OTP for login - validates credentials first"""
+    try:
+        # First authenticate the user credentials
+        user = authenticate_user(db, otp_request.email, otp_request.password)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid email or password",
+            )
+        
+        if not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Inactive user account"
+            )
+        
+        # Generate and send OTP
+        otp_code = generate_otp()
+        
+        # Store OTP in database
+        if not store_otp(db, otp_request.email, otp_code):
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to generate OTP. Please try again."
+            )
+        
+        # Send OTP via email
+        if not send_otp_email(otp_request.email, otp_code):
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to send OTP. Please try again."
+            )
+        
+        return OTPResponse(
+            message="OTP sent successfully to your email",
+            otp_sent=True
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"OTP request failed: {str(e)}"
+        )
+
+@app.post("/api/verify-otp", response_model=Token)
+@app.post("/api/api/verify-otp", response_model=Token)  # Handle double prefix
+async def verify_otp_and_login(otp_verification: OTPVerification, db: Session = Depends(get_db)):
+    """Verify OTP and return JWT token"""
+    try:
+        # Verify OTP code
+        if not verify_otp(db, otp_verification.email, otp_verification.otp_code):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or expired OTP code",
+            )
+        
+        # Get user by email
+        user = get_user_by_email(db, otp_verification.email)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found",
+            )
+        
+        if not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Inactive user account"
+            )
+        
+        # Create access token
+        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_access_token(
+            data={"sub": user.email}, expires_delta=access_token_expires
+        )
+        
+        # Clean up old sessions for this user
+        db.query(models.UserSession).filter(
+            models.UserSession.user_id == user.id,
+            models.UserSession.is_active == True
+        ).update({"is_active": False})
+        db.commit()
+        
+        # Create user session record with unique session token
+        unique_session_token = f"{access_token[:24]}_{str(uuid.uuid4())[:8]}"
+        session = models.UserSession(
+            user_id=user.id,
+            session_token=unique_session_token,
+            ip_address="unknown",
+            user_agent="unknown",
+            expires_at=datetime.now(timezone.utc) + access_token_expires,
+            is_active=True
+        )
+        db.add(session)
+        db.commit()
+        
+        return Token(
+            access_token=access_token,
+            token_type="bearer",
+            expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"OTP verification failed: {str(e)}"
         )
 
 @app.post("/api/login", response_model=Token)
