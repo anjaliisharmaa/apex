@@ -16,7 +16,8 @@ import {
   Bars3Icon,
   XMarkIcon,
   ShieldExclamationIcon,
-  CogIcon
+  CogIcon,
+  UserGroupIcon
 } from '@heroicons/react/24/outline'
 import { AnonymousToggle } from './anonymous-toggle'
 import { EmergencyButton } from './emergency-button'
@@ -26,6 +27,7 @@ const navigation = [
   { name: 'Chat', href: '/chat', icon: ChatBubbleLeftIcon },
   { name: 'Cases', href: '/cases', icon: FolderIcon },
   { name: 'Forms', href: '/forms', icon: DocumentIcon },
+  { name: 'Community', href: '/community', icon: UserGroupIcon },
   { name: 'Resources', href: '/resources', icon: BookOpenIcon },
   { name: 'Admin Portal', href: '/admin', icon: CogIcon },
 ]

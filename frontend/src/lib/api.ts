@@ -205,6 +205,57 @@ export interface EmployeeDetails {
   };
 }
 
+export interface ForumData {
+  id: string;
+  name: string;
+  description: string;
+  member_count: number;
+  is_private: boolean;
+  recent_activity: string;
+  category: string;
+}
+
+export interface ForumMessage {
+  id: string;
+  forum_id: string;
+  author: string;
+  author_anonymous: boolean;
+  author_id: string;
+  content: string;
+  timestamp: string;
+  replies: number;
+  likes: number;
+  is_pinned: boolean;
+}
+
+export interface MessageReply {
+  id: string;
+  message_id: string;
+  author: string;
+  author_anonymous: boolean;
+  author_id: string;
+  content: string;
+  timestamp: string;
+  likes: number;
+}
+
+export interface NewForumData {
+  name: string;
+  description: string;
+  is_private: boolean;
+  category: string;
+}
+
+export interface NewMessageData {
+  content: string;
+  anonymous: boolean;
+}
+
+export interface NewReplyData {
+  content: string;
+  anonymous: boolean;
+}
+
 class APEXAPIClient {
   private baseURL: string;
 
@@ -473,6 +524,74 @@ class APEXAPIClient {
    */
   async getEmployeeDetails(employeeEmail: string): Promise<EmployeeDetails> {
     return this.request<EmployeeDetails>(`/api/admin/employee/${encodeURIComponent(employeeEmail)}`);
+  }
+
+  // Community Forum API methods
+  /**
+   * Get all community forums
+   */
+  async getCommunityForums(): Promise<{ forums: ForumData[] }> {
+    return this.request<{ forums: ForumData[] }>('/api/community/forums');
+  }
+
+  /**
+   * Get messages from a specific forum
+   */
+  async getForumMessages(forumId: string, limit: number = 50, offset: number = 0): Promise<{ messages: ForumMessage[], total: number, has_more: boolean }> {
+    const params = new URLSearchParams();
+    params.append('limit', limit.toString());
+    params.append('offset', offset.toString());
+    
+    const queryString = params.toString();
+    const url = `/api/community/forums/${forumId}/messages${queryString ? `?${queryString}` : ''}`;
+    
+    return this.request<{ messages: ForumMessage[], total: number, has_more: boolean }>(url);
+  }
+
+  /**
+   * Post a new message to a forum
+   */
+  async postForumMessage(forumId: string, messageData: NewMessageData): Promise<any> {
+    return this.request(`/api/community/forums/${forumId}/messages`, {
+      method: 'POST',
+      body: JSON.stringify(messageData),
+    });
+  }
+
+  /**
+   * Create a new forum
+   */
+  async createForum(forumData: NewForumData): Promise<any> {
+    return this.request('/api/community/forums', {
+      method: 'POST',
+      body: JSON.stringify(forumData),
+    });
+  }
+
+  /**
+   * Join a forum
+   */
+  async joinForum(forumId: string): Promise<any> {
+    return this.request(`/api/community/forums/${forumId}/join`, {
+      method: 'POST',
+    });
+  }
+
+  /**
+   * Get replies to a message
+   */
+  async getMessageReplies(forumId: string, messageId: string): Promise<{ replies: MessageReply[] }> {
+    return this.request<{ replies: MessageReply[] }>(`/api/community/forums/${forumId}/messages/${messageId}/replies`);
+  }
+
+  /**
+   * Post a reply to a message
+   */
+  async postMessageReply(forumId: string, messageId: string, replyData: NewReplyData): Promise<any> {
+    return this.request(`/api/community/forums/${forumId}/messages/${messageId}/replies`, {
+      method: 'POST',
+      body: JSON.stringify(replyData),
+    });
   }
 }
 

@@ -1737,6 +1737,238 @@ async def get_case_details(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get case details: {str(e)}")
 
+# Community Forum APIs
+
+@app.get("/api/community/forums")
+@app.get("/api/api/community/forums")  # Handle double prefix
+async def get_community_forums(current_user: User = Depends(get_current_user)):
+    """
+    Get list of community forums/groups
+    """
+    try:
+        forums = [
+            {
+                "id": "general",
+                "name": "General Discussion",
+                "description": "Open forum for general workplace discussions",
+                "member_count": 127,
+                "is_private": False,
+                "recent_activity": "2024-11-12T10:30:00Z",
+                "category": "general"
+            },
+            {
+                "id": "women-in-science",
+                "name": "Women in Science & Technology",
+                "description": "Support group for women scientists and researchers",
+                "member_count": 89,
+                "is_private": False,
+                "recent_activity": "2024-11-12T09:45:00Z",
+                "category": "support"
+            },
+            {
+                "id": "work-life-balance",
+                "name": "Work-Life Balance",
+                "description": "Tips and discussions about maintaining healthy work-life balance",
+                "member_count": 156,
+                "is_private": False,
+                "recent_activity": "2024-11-12T08:20:00Z",
+                "category": "wellness"
+            },
+            {
+                "id": "maternity-support",
+                "name": "Maternity & Parenting Support",
+                "description": "Support group for expecting and new mothers",
+                "member_count": 43,
+                "is_private": True,
+                "recent_activity": "2024-11-12T07:15:00Z",
+                "category": "support"
+            },
+            {
+                "id": "career-development",
+                "name": "Career Development",
+                "description": "Discuss career growth, opportunities, and professional development",
+                "member_count": 98,
+                "is_private": False,
+                "recent_activity": "2024-11-11T16:30:00Z",
+                "category": "professional"
+            },
+            {
+                "id": "mental-health",
+                "name": "Mental Health & Wellness",
+                "description": "Anonymous support for mental health and wellness discussions",
+                "member_count": 67,
+                "is_private": True,
+                "recent_activity": "2024-11-11T14:45:00Z",
+                "category": "wellness"
+            }
+        ]
+        return {"forums": forums}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get forums: {str(e)}")
+
+@app.get("/api/community/forums/{forum_id}/messages")
+@app.get("/api/api/community/forums/{forum_id}/messages")  # Handle double prefix
+async def get_forum_messages(
+    forum_id: str,
+    limit: int = 50,
+    offset: int = 0,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get messages from a specific forum
+    """
+    try:
+        # Mock forum messages - in production, query from database
+        messages = [
+            {
+                "id": "msg-001",
+                "forum_id": forum_id,
+                "author": "Dr. Priya Sharma",
+                "author_anonymous": False,
+                "author_id": "user-123",
+                "content": "Has anyone else noticed the new flexible working policies? I think they're really helpful for balancing research work with family time.",
+                "timestamp": "2024-11-12T10:30:00Z",
+                "replies": 3,
+                "likes": 12,
+                "is_pinned": False
+            },
+            {
+                "id": "msg-002",
+                "forum_id": forum_id,
+                "author": "Anonymous User",
+                "author_anonymous": True,
+                "author_id": "anonymous",
+                "content": "I wanted to share that the recent maternity leave policy changes have been really beneficial. The extended support helped me transition back to work much better.",
+                "timestamp": "2024-11-12T09:15:00Z",
+                "replies": 8,
+                "likes": 24,
+                "is_pinned": True
+            },
+            {
+                "id": "msg-003",
+                "forum_id": forum_id,
+                "author": "Dr. Kavitha Nair",
+                "author_anonymous": False,
+                "author_id": "user-456",
+                "content": "Does anyone have experience with interdepartmental transfers? I'm considering moving from Electronics to AI Research and would love some insights.",
+                "timestamp": "2024-11-12T08:45:00Z",
+                "replies": 5,
+                "likes": 8,
+                "is_pinned": False
+            },
+            {
+                "id": "msg-004",
+                "forum_id": forum_id,
+                "author": "Anonymous User",
+                "author_anonymous": True,
+                "author_id": "anonymous",
+                "content": "Thank you to everyone who shared their experiences about workplace harassment reporting. Your support meant a lot during a difficult time.",
+                "timestamp": "2024-11-11T16:20:00Z",
+                "replies": 15,
+                "likes": 32,
+                "is_pinned": False
+            },
+            {
+                "id": "msg-005",
+                "forum_id": forum_id,
+                "author": "Dr. Ananya Gupta",
+                "author_anonymous": False,
+                "author_id": "user-789",
+                "content": "I'll be hosting a virtual session on 'Building Confidence in Male-Dominated Fields' next week. DM me if you're interested!",
+                "timestamp": "2024-11-11T14:30:00Z",
+                "replies": 12,
+                "likes": 28,
+                "is_pinned": False
+            }
+        ]
+        
+        # Apply pagination
+        paginated_messages = messages[offset:offset + limit]
+        
+        return {
+            "messages": paginated_messages,
+            "total": len(messages),
+            "has_more": len(messages) > offset + limit
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get forum messages: {str(e)}")
+
+@app.post("/api/community/forums/{forum_id}/messages")
+@app.post("/api/api/community/forums/{forum_id}/messages")  # Handle double prefix
+async def post_forum_message(
+    forum_id: str,
+    message_data: dict,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Post a new message to a forum
+    """
+    try:
+        content = message_data.get("content", "")
+        anonymous = message_data.get("anonymous", False)
+        
+        if not content.strip():
+            raise HTTPException(status_code=400, detail="Message content cannot be empty")
+        
+        # In production, save to database
+        new_message = {
+            "id": f"msg-{random.randint(1000, 9999)}",
+            "forum_id": forum_id,
+            "author": "Anonymous User" if anonymous else current_user.full_name or current_user.username,
+            "author_anonymous": anonymous,
+            "author_id": "anonymous" if anonymous else str(current_user.id),
+            "content": content,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "replies": 0,
+            "likes": 0,
+            "is_pinned": False
+        }
+        
+        return {
+            "message": "Message posted successfully",
+            "post": new_message
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to post message: {str(e)}")
+
+@app.post("/api/community/forums")
+@app.post("/api/api/community/forums")  # Handle double prefix
+async def create_forum(
+    forum_data: dict,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Create a new community forum/group
+    """
+    try:
+        name = forum_data.get("name", "")
+        description = forum_data.get("description", "")
+        is_private = forum_data.get("is_private", False)
+        category = forum_data.get("category", "general")
+        
+        if not name.strip():
+            raise HTTPException(status_code=400, detail="Forum name cannot be empty")
+        
+        # In production, save to database
+        new_forum = {
+            "id": f"forum-{random.randint(1000, 9999)}",
+            "name": name,
+            "description": description,
+            "member_count": 1,  # Creator is first member
+            "is_private": is_private,
+            "recent_activity": datetime.now(timezone.utc).isoformat(),
+            "category": category,
+            "created_by": current_user.id,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        
+        return {
+            "message": "Forum created successfully",
+            "forum": new_forum
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create forum: {str(e)}")
+
 if __name__ == "__main__":
     print("🚀 Starting APEX Backend Server...")
     print("🔧 Agents will be loaded on-demand for better reliability")
