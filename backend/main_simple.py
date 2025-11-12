@@ -1401,83 +1401,85 @@ async def get_all_cases(
         mock_cases = [
             {
                 "id": "CASE-2024-001",
-                "user_name": "Sarah Johnson",
-                "user_email": "sarah.j@company.com",
+                "user_name": "Dr. Priya Sharma",
+                "user_email": "priya.sharma@drdo.in",
                 "case_type": "Maternity Leave",
                 "title": "Maternity Leave Application",
                 "submitted_date": "2024-11-12",
                 "status": "pending",
                 "priority": "high",
                 "description": "Requesting 12 weeks maternity leave starting December 15, 2024.",
-                "department": "Engineering",
+                "department": "Aeronautical Development Establishment",
                 "created_at": "2024-11-12T09:15:00Z",
                 "updated_at": "2024-11-12T09:15:00Z"
             },
             {
                 "id": "CASE-2024-002",
-                "user_name": "Michael Chen",
-                "user_email": "michael.c@company.com",
+                "user_name": "Dr. Kavitha Nair",
+                "user_email": "kavitha.nair@drdo.in",
                 "case_type": "Transfer Request",
                 "title": "Department Transfer Request",
                 "submitted_date": "2024-11-11",
                 "status": "approved",
                 "priority": "medium",
-                "description": "Request to transfer from Marketing to Product Management.",
-                "department": "Marketing",
+                "description": "Request to transfer from Electronics & Radar Development to Missile Development.",
+                "department": "Electronics & Radar Development",
                 "created_at": "2024-11-11T14:30:00Z",
                 "updated_at": "2024-11-12T10:45:00Z"
             },
             {
                 "id": "CASE-2024-003",
-                "user_name": "Emily Davis",
-                "user_email": "emily.d@company.com",
+                "user_name": "Dr. Ananya Gupta",
+                "user_email": "ananya.gupta@drdo.in",
                 "case_type": "Harassment Report",
                 "title": "Workplace Harassment Complaint",
                 "submitted_date": "2024-11-10",
                 "status": "under_review",
                 "priority": "high",
-                "description": "Formal complaint regarding inappropriate behavior from supervisor.",
-                "department": "Sales",
+                "description": "Formal complaint regarding inappropriate behavior from supervisor during project meetings.",
+                "department": "Defence Research & Development Laboratory",
                 "created_at": "2024-11-10T16:20:00Z",
                 "updated_at": "2024-11-11T11:30:00Z"
             },
             {
                 "id": "CASE-2024-004",
-                "user_name": "David Wilson",
-                "user_email": "david.w@company.com",
+                "user_name": "Dr. Meera Krishnan",
+                "user_email": "meera.krishnan@drdo.in",
                 "case_type": "Policy Query",
-                "title": "Remote Work Policy Clarification",
+                "title": "Research Funding Policy Clarification",
                 "submitted_date": "2024-11-09",
                 "status": "approved",
                 "priority": "low",
-                "description": "Request for clarification on hybrid work schedule policy.",
-                "department": "Finance",
+                "description": "Request for clarification on interdisciplinary research funding policy.",
+                "department": "Defence Institute of Advanced Technology",
                 "created_at": "2024-11-09T13:45:00Z",
                 "updated_at": "2024-11-10T09:15:00Z"
             },
             {
                 "id": "CASE-2024-005",
-                "user_name": "Lisa Rodriguez",
-                "user_email": "lisa.r@company.com",
+                "user_name": "Dr. Sunita Reddy",
+                "user_email": "sunita.reddy@drdo.in",
                 "case_type": "Leave Request",
                 "title": "Extended Medical Leave",
                 "submitted_date": "2024-11-08",
                 "status": "rejected",
                 "priority": "medium",
-                "description": "Request for 6 months medical leave due to surgery.",
-                "department": "HR",
+                "description": "Request for 6 months medical leave due to surgery and recovery.",
+                "department": "Centre for Artificial Intelligence & Robotics",
                 "created_at": "2024-11-08T10:20:00Z",
                 "updated_at": "2024-11-09T15:30:00Z"
             },
             {
                 "id": "CASE-2024-006",
-                "user_name": "James Brown",
-                "user_email": "james.b@company.com",
+                "user_name": "Dr. Ritu Singh",
+                "user_email": "ritu.singh@drdo.in",
                 "case_type": "Salary Review",
                 "title": "Annual Salary Review Request",
                 "submitted_date": "2024-11-12",
                 "status": "pending",
                 "priority": "medium",
+                "description": "Request for performance-based salary increase review for outstanding research contributions.",
+                "department": "Terminal Ballistics Research Laboratory",
                 "description": "Request for performance-based salary increase review.",
                 "department": "Operations",
                 "created_at": "2024-11-12T11:00:00Z",
@@ -1547,15 +1549,15 @@ async def get_case_details(
         # Mock detailed case data - in production, query from database
         case_details = {
             "id": case_id,
-            "user_name": "Sarah Johnson",
-            "user_email": "sarah.j@company.com",
+            "user_name": "Dr. Priya Sharma",
+            "user_email": "priya.sharma@drdo.in",
             "case_type": "Maternity Leave",
             "title": "Maternity Leave Application",
             "submitted_date": "2024-11-12",
             "status": "pending",
             "priority": "high",
-            "description": "Requesting 12 weeks maternity leave starting December 15, 2024. This is a standard maternity leave request following company policy guidelines.",
-            "department": "Engineering",
+            "description": "Requesting 12 weeks maternity leave starting December 15, 2024. This is a standard maternity leave request following DRDO policy guidelines for women scientists.",
+            "department": "Aeronautical Development Establishment",
             "created_at": "2024-11-12T09:15:00Z",
             "updated_at": "2024-11-12T09:15:00Z",
             "attachments": [
@@ -1565,7 +1567,7 @@ async def get_case_details(
                     "uploaded_at": "2024-11-12T09:15:00Z"
                 },
                 {
-                    "filename": "doctor_certificate.pdf",
+                    "filename": "medical_certificate.pdf",
                     "size": 156482,
                     "uploaded_at": "2024-11-12T09:16:00Z"
                 }
@@ -1574,14 +1576,14 @@ async def get_case_details(
                 {
                     "action": "Case submitted",
                     "timestamp": "2024-11-12T09:15:00Z",
-                    "user": "sarah.j@company.com",
+                    "user": "priya.sharma@drdo.in",
                     "notes": "Initial submission"
                 },
                 {
                     "action": "Documents uploaded",
                     "timestamp": "2024-11-12T09:16:00Z",
-                    "user": "sarah.j@company.com",
-                    "notes": "Medical certificate and form attached"
+                    "user": "priya.sharma@drdo.in",
+                    "notes": "Medical certificate and DRDO leave form attached"
                 }
             ]
         }
