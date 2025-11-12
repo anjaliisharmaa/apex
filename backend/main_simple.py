@@ -1385,6 +1385,150 @@ async def get_admin_stats(current_user: User = Depends(get_current_user)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get stats: {str(e)}")
 
+@app.get("/api/admin/analytics")
+@app.get("/api/api/admin/analytics")  # Handle double prefix
+async def get_admin_analytics(current_user: User = Depends(get_current_user)):
+    """
+    Get analytics data for charts and graphs
+    """
+    try:
+        analytics = {
+            "case_types": [
+                {"name": "Maternity Leave", "value": 45, "percentage": 40},
+                {"name": "Transfer Request", "value": 23, "percentage": 20},
+                {"name": "Harassment Report", "value": 18, "percentage": 16},
+                {"name": "Leave Request", "value": 14, "percentage": 12},
+                {"name": "Policy Query", "value": 8, "percentage": 7},
+                {"name": "Salary Review", "value": 6, "percentage": 5}
+            ],
+            "cases_by_department": [
+                {"department": "Aeronautical Development Establishment", "pending": 12, "total": 28},
+                {"department": "Electronics & Radar Development", "pending": 8, "total": 22},
+                {"department": "Defence Research & Development Laboratory", "pending": 15, "total": 35},
+                {"department": "Defence Institute of Advanced Technology", "pending": 6, "total": 18},
+                {"department": "Centre for Artificial Intelligence & Robotics", "pending": 9, "total": 24},
+                {"department": "Terminal Ballistics Research Laboratory", "pending": 4, "total": 16}
+            ],
+            "monthly_trends": [
+                {"month": "Jul 2024", "submitted": 18, "resolved": 15},
+                {"month": "Aug 2024", "submitted": 22, "resolved": 19},
+                {"month": "Sep 2024", "submitted": 25, "resolved": 23},
+                {"month": "Oct 2024", "submitted": 28, "resolved": 26},
+                {"month": "Nov 2024", "submitted": 32, "resolved": 29}
+            ]
+        }
+        return analytics
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get analytics: {str(e)}")
+
+@app.get("/api/admin/recent-activity")
+@app.get("/api/api/admin/recent-activity")  # Handle double prefix
+async def get_recent_activity(current_user: User = Depends(get_current_user)):
+    """
+    Get recent activity feed for admin dashboard
+    """
+    try:
+        activities = [
+            {
+                "id": 1,
+                "type": "case_submitted",
+                "message": "Dr. Priya Sharma submitted a new Maternity Leave case",
+                "timestamp": "2024-11-12T09:15:00Z",
+                "case_id": "CASE-2024-001"
+            },
+            {
+                "id": 2,
+                "type": "case_approved",
+                "message": "Dr. Kavitha Nair's Transfer Request was approved",
+                "timestamp": "2024-11-12T08:45:00Z",
+                "case_id": "CASE-2024-002"
+            },
+            {
+                "id": 3,
+                "type": "case_under_review",
+                "message": "Dr. Ananya Gupta's Harassment Report moved to under review",
+                "timestamp": "2024-11-11T16:30:00Z",
+                "case_id": "CASE-2024-003"
+            },
+            {
+                "id": 4,
+                "type": "case_submitted",
+                "message": "Dr. Ritu Singh submitted a new Salary Review case",
+                "timestamp": "2024-11-11T14:20:00Z",
+                "case_id": "CASE-2024-006"
+            },
+            {
+                "id": 5,
+                "type": "case_rejected",
+                "message": "Dr. Sunita Reddy's Leave Request was rejected",
+                "timestamp": "2024-11-11T11:15:00Z",
+                "case_id": "CASE-2024-005"
+            }
+        ]
+        return {"activities": activities}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get recent activity: {str(e)}")
+
+@app.get("/api/admin/employee/{employee_email}")
+@app.get("/api/api/admin/employee/{employee_email}")  # Handle double prefix
+async def get_employee_details(
+    employee_email: str,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get detailed employee information and case history
+    """
+    try:
+        # Mock employee data - in production, query from database
+        employee_details = {
+            "name": "Dr. Priya Sharma",
+            "email": "priya.sharma@drdo.in",
+            "employee_id": "DRDO/ADE/2019/0234",
+            "department": "Aeronautical Development Establishment",
+            "role": "Senior Research Scientist",
+            "join_date": "2019-06-15",
+            "phone": "+91-80-2508-6789",
+            "supervisor": "Dr. Rajesh Kumar",
+            "location": "Bangalore, Karnataka",
+            "security_clearance": "Secret",
+            "specialization": "Aircraft Structural Analysis",
+            "cases": [
+                {
+                    "id": "CASE-2024-001",
+                    "case_type": "Maternity Leave",
+                    "title": "Maternity Leave Application",
+                    "submitted_date": "2024-11-12",
+                    "status": "pending",
+                    "priority": "high"
+                },
+                {
+                    "id": "CASE-2023-089",
+                    "case_type": "Leave Request",
+                    "title": "Annual Leave Application",
+                    "submitted_date": "2023-12-15",
+                    "status": "approved",
+                    "priority": "low"
+                },
+                {
+                    "id": "CASE-2023-034",
+                    "case_type": "Policy Query",
+                    "title": "Research Publication Guidelines",
+                    "submitted_date": "2023-08-22",
+                    "status": "resolved",
+                    "priority": "medium"
+                }
+            ],
+            "performance_summary": {
+                "total_cases": 3,
+                "pending_cases": 1,
+                "average_resolution_time": "7 days",
+                "last_case_date": "2024-11-12"
+            }
+        }
+        return employee_details
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get employee details: {str(e)}")
+
 @app.get("/api/admin/cases")
 @app.get("/api/api/admin/cases")  # Handle double prefix
 async def get_all_cases(

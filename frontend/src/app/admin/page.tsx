@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { apiClient, type CaseData, type AdminStats } from '@/lib/api';
+import { apiClient, type CaseData, type AdminStats, type AnalyticsData, type RecentActivity } from '@/lib/api';
 import {
   UserGroupIcon,
   DocumentTextIcon,
@@ -15,6 +16,9 @@ import {
   EyeIcon,
   PlusCircleIcon,
   MinusCircleIcon,
+  MagnifyingGlassIcon,
+  ChartPieIcon,
+  ChartBarIcon,
 } from '@heroicons/react/24/outline';
 
 interface DashboardStats {
@@ -34,9 +38,13 @@ export default function AdminDashboard() {
     new_today: 0,
     total_cases: 0,
   });
+  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
+  const [recentActivity, setRecentActivity] = useState<RecentActivity | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedCase, setSelectedCase] = useState<CaseData | null>(null);
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showAnalytics, setShowAnalytics] = useState(false);
   const router = useRouter();
 
   // Load data from API
@@ -51,14 +59,18 @@ export default function AdminDashboard() {
           return;
         }
 
-        // Load stats and cases in parallel
-        const [statsResult, casesResult] = await Promise.all([
+        // Load stats, cases, analytics, and recent activity in parallel
+        const [statsResult, casesResult, analyticsResult, activityResult] = await Promise.all([
           apiClient.getAdminStats(),
-          apiClient.getAdminCases('all', 100, 0)
+          apiClient.getAdminCases('all', 100, 0),
+          apiClient.getAdminAnalytics(),
+          apiClient.getRecentActivity()
         ]);
 
         // Set cases
         setCases(casesResult.cases);
+        setAnalytics(analyticsResult);
+        setRecentActivity(activityResult);
 
         // Calculate stats from API data
         setStats({
@@ -160,6 +172,14 @@ export default function AdminDashboard() {
     ? cases 
     : cases.filter(case_ => case_.status === filter);
 
+  // Apply search filter
+  const searchFilteredCases = filteredCases.filter(case_ =>
+    case_.user_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    case_.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    case_.case_type.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    case_.department.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -244,21 +264,163 @@ export default function AdminDashboard() {
           </Card>
         </div>
 
-        {/* Filters */}
+        {/* Tab Navigation */}
         <div className="mb-6">
-          <div className="flex space-x-2">
-            {(['all', 'pending', 'approved', 'rejected'] as const).map((status) => (
-              <Button
-                key={status}
-                variant={filter === status ? 'default' : 'outline'}
-                onClick={() => setFilter(status)}
-                className="capitalize"
-              >
-                {status === 'all' ? 'All Cases' : `${status.charAt(0).toUpperCase() + status.slice(1)}`}
-              </Button>
-            ))}
+          <div className="flex space-x-4 border-b border-gray-200">
+            <button
+              className={`px-4 py-2 font-medium text-sm border-b-2 ${
+                !showAnalytics
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+              onClick={() => setShowAnalytics(false)}
+            >
+              <DocumentTextIcon className="h-4 w-4 inline mr-2" />
+              Cases Management
+            </button>
+            <button
+              className={`px-4 py-2 font-medium text-sm border-b-2 ${
+                showAnalytics
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+              onClick={() => setShowAnalytics(true)}
+            >
+              <ChartPieIcon className="h-4 w-4 inline mr-2" />
+              Analytics & Reports
+            </button>
           </div>
         </div>
+
+        {showAnalytics ? (
+          // Analytics View
+          <div className="space-y-8">
+            {/* Analytics Charts */}
+            {analytics && (
+              <>
+                {/* Case Types Chart */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center">
+                      <ChartPieIcon className="h-5 w-5 mr-2" />
+                      Case Types Distribution
+                    </CardTitle>
+                    <CardDescription>Breakdown of all cases by type</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                      {analytics.case_types.map((type, index) => (
+                        <div key={type.name} className="text-center p-4 bg-gray-50 rounded-lg">
+                          <div className={`text-2xl font-bold mb-2 ${
+                            index === 0 ? 'text-blue-600' :
+                            index === 1 ? 'text-green-600' :
+                            index === 2 ? 'text-red-600' :
+                            index === 3 ? 'text-yellow-600' :
+                            index === 4 ? 'text-purple-600' : 'text-gray-600'
+                          }`}>
+                            {type.percentage}%
+                          </div>
+                          <div className="text-sm font-medium text-gray-900">{type.name}</div>
+                          <div className="text-xs text-gray-500">{type.value} cases</div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Department Cases Chart */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center">
+                      <ChartBarIcon className="h-5 w-5 mr-2" />
+                      Cases by Department
+                    </CardTitle>
+                    <CardDescription>Active and total cases per department</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {analytics.cases_by_department.map((dept) => (
+                        <div key={dept.department} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                          <div className="flex-1">
+                            <div className="font-medium text-gray-900 truncate">{dept.department}</div>
+                            <div className="text-sm text-gray-500">Total: {dept.total} cases</div>
+                          </div>
+                          <div className="flex items-center space-x-4">
+                            <div className="text-center">
+                              <div className="text-lg font-bold text-yellow-600">{dept.pending}</div>
+                              <div className="text-xs text-gray-500">Pending</div>
+                            </div>
+                            <div className="w-24 bg-gray-200 rounded-full h-2">
+                              <div
+                                className="bg-blue-600 h-2 rounded-full"
+                                style={{ width: `${(dept.pending / dept.total) * 100}%` }}
+                              ></div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Recent Activity */}
+                {recentActivity && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Recent Activity</CardTitle>
+                      <CardDescription>Latest case updates and submissions</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        {recentActivity.activities.map((activity) => (
+                          <div key={activity.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <div className="flex-1">
+                              <p className="text-sm text-gray-900">{activity.message}</p>
+                              <p className="text-xs text-gray-500">
+                                {new Date(activity.timestamp).toLocaleString()}
+                              </p>
+                            </div>
+                            <div className="text-xs font-mono text-blue-600">{activity.case_id}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </>
+            )}
+          </div>
+        ) : (
+          // Cases Management View
+          <>
+            {/* Search and Filters */}
+            <div className="mb-6 flex flex-col sm:flex-row gap-4">
+              {/* Search Bar */}
+              <div className="flex-1 relative">
+                <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search by name, case ID, type, or department..."
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+
+              {/* Status Filters */}
+              <div className="flex space-x-2">
+                {(['all', 'pending', 'approved', 'rejected'] as const).map((status) => (
+                  <Button
+                    key={status}
+                    variant={filter === status ? 'default' : 'outline'}
+                    onClick={() => setFilter(status)}
+                    className="capitalize"
+                  >
+                    {status === 'all' ? 'All Cases' : `${status.charAt(0).toUpperCase() + status.slice(1)}`}
+                  </Button>
+                ))}
+              </div>
+            </div>
 
         {/* Cases Table */}
         <Card>
@@ -284,7 +446,7 @@ export default function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredCases.map((case_) => (
+                  {searchFilteredCases.map((case_) => (
                     <tr key={case_.id} className="border-b hover:bg-gray-50">
                       <td className="p-3">
                         <div className="font-mono text-sm font-medium text-blue-600">
@@ -293,7 +455,12 @@ export default function AdminDashboard() {
                       </td>
                       <td className="p-3">
                         <div>
-                          <div className="font-medium text-gray-900">{case_.user_name}</div>
+                          <Link
+                            href={`/admin/employee/${encodeURIComponent(case_.user_email)}`}
+                            className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                          >
+                            {case_.user_name}
+                          </Link>
                           <div className="text-sm text-gray-500">{case_.user_email}</div>
                         </div>
                       </td>
@@ -353,15 +520,20 @@ export default function AdminDashboard() {
               </table>
             </div>
 
-            {filteredCases.length === 0 && (
+            {searchFilteredCases.length === 0 && (
               <div className="text-center py-12">
                 <DocumentTextIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-gray-900 mb-2">No cases found</h3>
-                <p className="text-gray-500">No cases match the current filter criteria.</p>
+                <p className="text-gray-500">
+                  {searchTerm ? 'No cases match your search criteria.' : 'No cases match the current filter criteria.'}
+                </p>
               </div>
             )}
           </CardContent>
         </Card>
+
+        </>
+        )}
 
         {/* Case Detail Modal */}
         {selectedCase && (

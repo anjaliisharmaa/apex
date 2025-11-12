@@ -149,6 +149,62 @@ export interface StatusUpdateRequest {
   notes?: string;
 }
 
+export interface AnalyticsData {
+  case_types: Array<{
+    name: string;
+    value: number;
+    percentage: number;
+  }>;
+  cases_by_department: Array<{
+    department: string;
+    pending: number;
+    total: number;
+  }>;
+  monthly_trends: Array<{
+    month: string;
+    submitted: number;
+    resolved: number;
+  }>;
+}
+
+export interface RecentActivity {
+  activities: Array<{
+    id: number;
+    type: string;
+    message: string;
+    timestamp: string;
+    case_id: string;
+  }>;
+}
+
+export interface EmployeeDetails {
+  name: string;
+  email: string;
+  employee_id: string;
+  department: string;
+  role: string;
+  join_date: string;
+  phone: string;
+  supervisor: string;
+  location: string;
+  security_clearance: string;
+  specialization: string;
+  cases: Array<{
+    id: string;
+    case_type: string;
+    title: string;
+    submitted_date: string;
+    status: string;
+    priority: string;
+  }>;
+  performance_summary: {
+    total_cases: number;
+    pending_cases: number;
+    average_resolution_time: string;
+    last_case_date: string;
+  };
+}
+
 class APEXAPIClient {
   private baseURL: string;
 
@@ -396,6 +452,27 @@ class APEXAPIClient {
    */
   async getCaseDetails(caseId: string): Promise<CaseData> {
     return this.request<CaseData>(`/api/admin/cases/${caseId}`);
+  }
+
+  /**
+   * Get analytics data for charts
+   */
+  async getAdminAnalytics(): Promise<AnalyticsData> {
+    return this.request<AnalyticsData>('/api/admin/analytics');
+  }
+
+  /**
+   * Get recent activity feed
+   */
+  async getRecentActivity(): Promise<RecentActivity> {
+    return this.request<RecentActivity>('/api/admin/recent-activity');
+  }
+
+  /**
+   * Get employee details and case history
+   */
+  async getEmployeeDetails(employeeEmail: string): Promise<EmployeeDetails> {
+    return this.request<EmployeeDetails>(`/api/admin/employee/${encodeURIComponent(employeeEmail)}`);
   }
 }
 
