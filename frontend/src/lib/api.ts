@@ -101,6 +101,54 @@ export interface UserResponse {
   created_at: string;
 }
 
+export interface AdminStats {
+  total_cases: number;
+  total_pending: number;
+  total_approved: number;
+  total_rejected: number;
+  new_today: number;
+  active_users: number;
+  avg_response_time: number;
+  success_rate: number;
+}
+
+export interface CaseData {
+  id: string;
+  user_name: string;
+  user_email: string;
+  case_type: string;
+  title: string;
+  submitted_date: string;
+  status: 'pending' | 'approved' | 'rejected' | 'under_review';
+  priority: 'high' | 'medium' | 'low';
+  description: string;
+  department: string;
+  created_at: string;
+  updated_at: string;
+  attachments?: Array<{
+    filename: string;
+    size: number;
+    uploaded_at: string;
+  }>;
+  history?: Array<{
+    action: string;
+    timestamp: string;
+    user: string;
+    notes: string;
+  }>;
+}
+
+export interface CasesResponse {
+  cases: CaseData[];
+  total: number;
+  has_more: boolean;
+}
+
+export interface StatusUpdateRequest {
+  status: string;
+  notes?: string;
+}
+
 class APEXAPIClient {
   private baseURL: string;
 
@@ -306,6 +354,48 @@ class APEXAPIClient {
    */
   isAuthenticated(): boolean {
     return this.getStoredToken() !== null;
+  }
+
+  // Admin API methods
+  /**
+   * Get admin dashboard statistics
+   */
+  async getAdminStats(): Promise<AdminStats> {
+    return this.request<AdminStats>('/api/admin/stats');
+  }
+
+  /**
+   * Get all cases for admin
+   */
+  async getAdminCases(status?: string, limit: number = 100, offset: number = 0): Promise<CasesResponse> {
+    const params = new URLSearchParams();
+    if (status && status !== 'all') {
+      params.append('status', status);
+    }
+    params.append('limit', limit.toString());
+    params.append('offset', offset.toString());
+    
+    const queryString = params.toString();
+    const url = `/api/admin/cases${queryString ? `?${queryString}` : ''}`;
+    
+    return this.request<CasesResponse>(url);
+  }
+
+  /**
+   * Update case status
+   */
+  async updateCaseStatus(caseId: string, statusUpdate: StatusUpdateRequest): Promise<any> {
+    return this.request(`/api/admin/cases/${caseId}/status`, {
+      method: 'PUT',
+      body: JSON.stringify(statusUpdate),
+    });
+  }
+
+  /**
+   * Get detailed case information
+   */
+  async getCaseDetails(caseId: string): Promise<CaseData> {
+    return this.request<CaseData>(`/api/admin/cases/${caseId}`);
   }
 }
 

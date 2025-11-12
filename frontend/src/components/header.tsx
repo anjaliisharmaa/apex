@@ -15,7 +15,8 @@ import {
   BellIcon,
   Bars3Icon,
   XMarkIcon,
-  ShieldExclamationIcon
+  ShieldExclamationIcon,
+  CogIcon
 } from '@heroicons/react/24/outline'
 import { AnonymousToggle } from './anonymous-toggle'
 import { EmergencyButton } from './emergency-button'
@@ -26,6 +27,7 @@ const navigation = [
   { name: 'Cases', href: '/cases', icon: FolderIcon },
   { name: 'Forms', href: '/forms', icon: DocumentIcon },
   { name: 'Resources', href: '/resources', icon: BookOpenIcon },
+  { name: 'Admin Portal', href: '/admin', icon: CogIcon },
 ]
 
 export function Header() {
