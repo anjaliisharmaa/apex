@@ -272,13 +272,21 @@ class OrchestratorAgent:
         message_lower = message.lower()
         
         # Quick keyword scoring (optimized)
-        legal_score = sum(1 for k in ["rights", "law", "legal", "harassment", "maternity", "leave", "transfer", "workplace"] if k in message_lower)
-        emotional_score = sum(1 for k in ["stressed", "help", "support", "worried", "overwhelmed", "feeling"] if k in message_lower)
+        legal_score = sum(1 for k in ["rights", "law", "legal", "maternity", "leave", "transfer", "workplace policy", "contract"] if k in message_lower)
+        emotional_score = sum(1 for k in ["stressed", "help", "support", "worried", "overwhelmed", "feeling", "trauma", "traumatic", "traumatising", "traumatizing", "anxiety", "depression", "mental health", "burnout", "emotional", "cope", "coping", "difficult", "struggling", "upset", "hurt", "pain", "distressed", "afraid", "scared", "nervous"] if k in message_lower)
         document_score = sum(1 for k in ["generate", "create", "write", "draft", "form", "application"] if k in message_lower)
         
-        # Determine primary intent quickly
+        # Determine primary intent quickly - prioritize emotional support
         scores = {"legal": legal_score, "emotional": emotional_score, "documentation": document_score}
-        primary_intent = max(scores, key=scores.get) if any(scores.values()) else "legal"  # Default to legal
+        
+        # Special handling for emotional/trauma queries
+        trauma_indicators = ["trauma", "traumatic", "traumatising", "traumatizing", "feels", "feeling"]
+        if any(indicator in message_lower for indicator in trauma_indicators):
+            emotional_score += 3  # Boost emotional score for trauma-related queries
+            scores["emotional"] = emotional_score
+        
+        # Default to emotional support if no clear intent (workplace support context)
+        primary_intent = max(scores, key=scores.get) if any(scores.values()) else "emotional"
         
         # Fast multi-agent check - only for high-complexity cases
         needs_multiple = False
@@ -365,7 +373,7 @@ class OrchestratorAgent:
             "documentation": "scribe"
         }
         
-        return intent_to_agent.get(primary_intent, "athena")  # Default to athena for legal guidance
+        return intent_to_agent.get(primary_intent, "asha")  # Default to asha for emotional support
     
     def execute_single_agent_workflow(self, message: str, agent_type: str, session_id: str, timeout: int = 30) -> Dict[str, Any]:
         """
