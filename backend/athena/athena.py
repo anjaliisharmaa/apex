@@ -447,10 +447,12 @@ class AthenaAgent:
                         
                         # Debug: Print response structure for troubleshooting
                         print(f"🔍 API Response Status: {response.status}")
+                        print(f"🔍 Response keys: {list(response_data.keys())}")
                         
                         # Extract the response text
                         if 'candidates' in response_data and len(response_data['candidates']) > 0:
                             candidate = response_data['candidates'][0]
+                            print(f"🔍 Candidate keys: {list(candidate.keys())}")
                             
                             if 'content' in candidate and 'parts' in candidate['content']:
                                 athena_response = candidate['content']['parts'][0]['text']
@@ -470,9 +472,9 @@ class AthenaAgent:
                                     "timestamp": datetime.now().isoformat()
                                 })
                                 
-                                return f"⚖️ {formatted_response}"
+                                total_time = time.time() - query_start
                                 print(f"⚡ Total response time: {total_time:.2f}s")
-                                return f"⚖️ {athena_response}"
+                                return f"⚖️ {formatted_response}"
                             else:
                                 return "❌ Unexpected response format from API. The response structure has changed."
                         else:
