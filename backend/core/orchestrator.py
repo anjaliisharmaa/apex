@@ -288,12 +288,14 @@ class OrchestratorAgent:
         # Default to emotional support if no clear intent (workplace support context)
         primary_intent = max(scores, key=scores.get) if any(scores.values()) else "emotional"
         
-        # Fast multi-agent check - only for high-complexity cases
+        # Fast multi-agent check - detect when multiple agents are needed
         needs_multiple = False
-        if legal_score >= 2 and emotional_score >= 1:
-            needs_multiple = True
+        if legal_score >= 1 and document_score >= 1:
+            needs_multiple = True  # Legal + Document generation (e.g., complaint letters with legal guidance)
+        elif legal_score >= 2 and emotional_score >= 1:
+            needs_multiple = True  # Legal + Emotional support
         elif any(word in message_lower for word in ["harassment", "discrimination", "unfair treatment"]):
-            needs_multiple = True
+            needs_multiple = True  # Complex legal-emotional cases
         
         return {
             "primary_intent": primary_intent,

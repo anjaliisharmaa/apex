@@ -436,13 +436,17 @@ class AthenaAgent:
                 }
             )
             
-            # Make the request with optimized timeout for faster responses
-            api_start = time.time()
-            try:
-                with urllib.request.urlopen(req, timeout=10) as response:  # Reduced from 15s to 10s
-                    api_time = time.time() - api_start
-                    print(f"⚡ API call: {api_time:.2f}s")
-                    if response.status == 200:
+            # Make the request with optimized timeout and retry logic
+            max_retries = 2
+            retry_delay = 1
+            
+            for attempt in range(max_retries + 1):
+                api_start = time.time()
+                try:
+                    with urllib.request.urlopen(req, timeout=10) as response:  # Reduced from 15s to 10s
+                        api_time = time.time() - api_start
+                        print(f"⚡ API call: {api_time:.2f}s")
+                        if response.status == 200:
                         response_data = json.loads(response.read().decode())
                         
                         # Debug: Print response structure for troubleshooting
@@ -484,8 +488,21 @@ class AthenaAgent:
                         
             except urllib.error.HTTPError as e:
                 error_body = e.read().decode() if hasattr(e, 'read') else str(e)
-                return f"❌ HTTP Error {e.code}: {error_body}"
+                if e.code == 503 and attempt < max_retries:
+                    print(f"⚠️ API overloaded (503), retrying in {retry_delay}s... (attempt {attempt + 1}/{max_retries + 1})")
+                    time.sleep(retry_delay)
+                    retry_delay *= 2  # Exponential backoff
+                    continue
+                elif e.code == 503:
+                    return f"❌ The legal guidance service is temporarily overloaded. Please try again in a few moments. If this persists, I can provide general legal information based on my knowledge."
+                else:
+                    return f"❌ HTTP Error {e.code}: {error_body}"
             except urllib.error.URLError as e:
+                if attempt < max_retries:
+                    print(f"⚠️ Connection error, retrying in {retry_delay}s... (attempt {attempt + 1}/{max_retries + 1})")
+                    time.sleep(retry_delay)
+                    retry_delay *= 2
+                    continue
                 return f"❌ Connection Error: {e.reason}"
             except json.JSONDecodeError as e:
                 return f"❌ Invalid JSON response from API: {e}"

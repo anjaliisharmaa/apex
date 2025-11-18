@@ -219,9 +219,7 @@ export default function LoginPage() {
                     <p className="text-sm text-green-700">
                       📧 OTP request sent for <strong>{email}</strong>
                     </p>
-                    <p className="text-xs text-green-600 mt-1">
-                      💡 Development Mode: Enter any 6-digit number (e.g., 123456)
-                    </p>
+                    
                   </div>
                 </div>
 

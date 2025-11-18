@@ -325,7 +325,7 @@ export default function ChatPage() {
                       {conv.lastMessage}
                     </p>
                     <p className="text-xs text-gray-400 mt-1">
-                      {conv.timestamp.toLocaleDateString()}
+                      {typeof window !== 'undefined' ? conv.timestamp.toLocaleDateString() : ''}
                     </p>
                   </div>
                   {conv.isAnonymous && (
@@ -459,7 +459,7 @@ export default function ChatPage() {
                 
                 <div className="flex items-center justify-between mt-1">
                   <p className="text-xs opacity-70">
-                    {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    {typeof window !== 'undefined' ? message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                   </p>
                   {message.intentAnalysis && (
                     <p className="text-xs opacity-60">
