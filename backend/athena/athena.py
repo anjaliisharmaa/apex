@@ -447,7 +447,7 @@ class AthenaAgent:
                         api_time = time.time() - api_start
                         print(f"⚡ API call: {api_time:.2f}s")
                         if response.status == 200:
-                        response_data = json.loads(response.read().decode())
+                            response_data = json.loads(response.read().decode())
                         
                         # Debug: Print response structure for troubleshooting
                         print(f"🔍 API Response Status: {response.status}")
@@ -485,27 +485,27 @@ class AthenaAgent:
                             return "❌ No valid response candidates returned from API."
                     else:
                         return f"❌ API returned status code: {response.status}"
-                        
-            except urllib.error.HTTPError as e:
-                error_body = e.read().decode() if hasattr(e, 'read') else str(e)
-                if e.code == 503 and attempt < max_retries:
-                    print(f"⚠️ API overloaded (503), retrying in {retry_delay}s... (attempt {attempt + 1}/{max_retries + 1})")
-                    time.sleep(retry_delay)
-                    retry_delay *= 2  # Exponential backoff
-                    continue
-                elif e.code == 503:
-                    return f"❌ The legal guidance service is temporarily overloaded. Please try again in a few moments. If this persists, I can provide general legal information based on my knowledge."
-                else:
-                    return f"❌ HTTP Error {e.code}: {error_body}"
-            except urllib.error.URLError as e:
-                if attempt < max_retries:
-                    print(f"⚠️ Connection error, retrying in {retry_delay}s... (attempt {attempt + 1}/{max_retries + 1})")
-                    time.sleep(retry_delay)
-                    retry_delay *= 2
-                    continue
-                return f"❌ Connection Error: {e.reason}"
-            except json.JSONDecodeError as e:
-                return f"❌ Invalid JSON response from API: {e}"
+                            
+                except urllib.error.HTTPError as e:
+                    error_body = e.read().decode() if hasattr(e, 'read') else str(e)
+                    if e.code == 503 and attempt < max_retries:
+                        print(f"⚠️ API overloaded (503), retrying in {retry_delay}s... (attempt {attempt + 1}/{max_retries + 1})")
+                        time.sleep(retry_delay)
+                        retry_delay *= 2  # Exponential backoff
+                        continue
+                    elif e.code == 503:
+                        return f"❌ The legal guidance service is temporarily overloaded. Please try again in a few moments. If this persists, I can provide general legal information based on my knowledge."
+                    else:
+                        return f"❌ HTTP Error {e.code}: {error_body}"
+                except urllib.error.URLError as e:
+                    if attempt < max_retries:
+                        print(f"⚠️ Connection error, retrying in {retry_delay}s... (attempt {attempt + 1}/{max_retries + 1})")
+                        time.sleep(retry_delay)
+                        retry_delay *= 2
+                        continue
+                    return f"❌ Connection Error: {e.reason}"
+                except json.JSONDecodeError as e:
+                    return f"❌ Invalid JSON response from API: {e}"
             
         except Exception as e:
             print(f"🔍 Debug - Unexpected error: {type(e).__name__}: {str(e)}")
